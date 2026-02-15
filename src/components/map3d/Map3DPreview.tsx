@@ -29,6 +29,7 @@ export function Map3DPreview({
 }: Map3DPreviewProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
+  const hasLoadedRef = useRef(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [is3DMode, setIs3DMode] = useState(true);
@@ -47,6 +48,19 @@ export function Map3DPreview({
     return () => undefined;
   }, []);
 
+  const clearZoneLayers = useCallback((map: Map) => {
+    ['zones-fill', 'zones-outline', 'application-zone-fill', 'application-zone-outline'].forEach((id) => {
+      if (map.getLayer(id)) {
+        map.removeLayer(id);
+      }
+    });
+    ['zones', 'application-zone'].forEach((id) => {
+      if (map.getSource(id)) {
+        map.removeSource(id);
+      }
+    });
+  }, []);
+
   const addZoneLayers = useCallback(
     (map: Map) => {
       const getZoneColor = (code: string) => {
@@ -60,6 +74,8 @@ export function Map3DPreview({
         };
         return c[code.charAt(0).toUpperCase()] ?? '#6b7280';
       };
+
+      clearZoneLayers(map);
 
       if (showZones && nearbyZones.length > 0) {
         try {
@@ -126,7 +142,7 @@ export function Map3DPreview({
         }
       }
     },
-    [showZones, zoning, nearbyZones],
+    [clearZoneLayers, showZones, zoning, nearbyZones],
   );
 
   useEffect(() => {
@@ -145,6 +161,10 @@ export function Map3DPreview({
         : 'mapbox://styles/mapbox/light-v11';
 
     try {
+      hasLoadedRef.current = false;
+      setIsLoading(true);
+      setError(null);
+
       const map = new mapboxgl.Map({
         container: mapContainerRef.current,
         style: styleUrl,
@@ -160,6 +180,7 @@ export function Map3DPreview({
       map.addControl(new mapboxgl.ScaleControl({ unit: 'metric' }), 'bottom-left');
 
       map.on('load', () => {
+        hasLoadedRef.current = true;
         if (config.enableTerrain) {
           map.addSource('mapbox-dem', {
             type: 'raster-dem',
@@ -221,10 +242,30 @@ export function Map3DPreview({
         setIsLoading(false);
       });
 
+      map.on('error', (event) => {
+        // Surface map/style/token errors instead of endless spinner
+        if (!hasLoadedRef.current) {
+          const message =
+            (event?.error as Error | undefined)?.message ??
+            'Mapbox failed to load. Check token/domain restrictions.';
+          setError(message);
+          setIsLoading(false);
+        }
+      });
+
+      const timeout = window.setTimeout(() => {
+        if (!hasLoadedRef.current) {
+          setError('Mapbox load timed out. Check token and allowed domain settings.');
+          setIsLoading(false);
+        }
+      }, 12000);
+
       mapRef.current = map;
       return () => {
+        window.clearTimeout(timeout);
         map.remove();
         mapRef.current = null;
+        hasLoadedRef.current = false;
       };
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load map');
@@ -232,7 +273,91 @@ export function Map3DPreview({
       return () => undefined;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [latitude, longitude, mapStyle, activePreset]);
+  }, [latitude, longitude, addZoneLayers]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const styleUrl =
+      mapStyle === 'satellite'
+        ? 'mapbox://styles/mapbox/satellite-streets-v12'
+        : 'mapbox://styles/mapbox/light-v11';
+    map.setStyle(styleUrl);
+
+    const onStyleLoad = () => {
+      const config = getMap3DConfig();
+      try {
+        if (config.enableTerrain && !map.getSource('mapbox-dem')) {
+          map.addSource('mapbox-dem', {
+            type: 'raster-dem',
+            url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+            tileSize: 512,
+            maxzoom: 14,
+          });
+          map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.5 });
+        }
+        if (config.enableSky && !map.getLayer('sky')) {
+          map.addLayer({
+            id: 'sky',
+            type: 'sky',
+            paint: {
+              'sky-type': 'atmosphere',
+              'sky-atmosphere-sun': [0.0, 90.0],
+              'sky-atmosphere-sun-intensity': 15,
+            },
+          });
+        }
+        const { layers } = map.getStyle();
+        const labelLayerId = layers?.find(
+          (l) => l.type === 'symbol' && (l.layout as Record<string, unknown>)?.['text-field'],
+        )?.id;
+        if (labelLayerId && !map.getLayer(config.buildingsLayerId)) {
+          map.addLayer(
+            {
+              id: config.buildingsLayerId,
+              source: 'composite',
+              'source-layer': 'building',
+              filter: ['==', 'extrude', 'true'],
+              type: 'fill-extrusion',
+              minzoom: 14,
+              paint: {
+                'fill-extrusion-color': [
+                  'interpolate',
+                  ['linear'],
+                  ['get', 'height'],
+                  0,
+                  'hsl(200, 60%, 85%)',
+                  20,
+                  'hsl(200, 70%, 70%)',
+                  40,
+                  'hsl(210, 75%, 60%)',
+                  60,
+                  'hsl(220, 80%, 50%)',
+                  100,
+                  'hsl(230, 85%, 40%)',
+                ],
+                'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 14, 0, 14.5, ['get', 'height']],
+                'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], 14, 0, 14.5, ['get', 'min_height']],
+                'fill-extrusion-opacity': 0.85,
+              },
+            },
+            labelLayerId,
+          );
+        }
+      } catch {
+        // ignore and let map continue
+      }
+      addZoneLayers(map);
+    };
+
+    map.once('style.load', onStyleLoad);
+  }, [mapStyle, addZoneLayers]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    addZoneLayers(map);
+  }, [showZones, zoning, nearbyZones, addZoneLayers]);
 
 
   const toggleMapStyle = useCallback(() => {

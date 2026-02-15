@@ -42,11 +42,20 @@ export default function DashboardPage() {
   const {
     data: response,
     isLoading,
-    isFetching,
   } = useApplications(queryFilters, page, pageSize, hasActiveFilters);
 
-  const applications = response?.data ?? [];
-  const totalResults = response?.total ?? 0;
+  const rawApplications = response?.data ?? [];
+  const shouldClientPaginate =
+    rawApplications.length > pageSize &&
+    (response?.page === undefined || response?.pageSize === undefined);
+
+  const applications = shouldClientPaginate
+    ? rawApplications.slice((page - 1) * pageSize, page * pageSize)
+    : rawApplications;
+
+  const totalResults = shouldClientPaginate
+    ? (response?.total ?? rawApplications.length)
+    : (response?.total ?? rawApplications.length);
   const totalPages = Math.ceil(totalResults / pageSize);
 
   // Scroll restoration when returning from application detail

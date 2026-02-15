@@ -46,7 +46,7 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
   setViewMode: (mode) => set({ viewMode: mode }),
 
   page: 1,
-  pageSize: 16,
+  pageSize: 20,
   setPage: (page) => set({ page }),
   setPageSize: (size) => set({ pageSize: size, page: 1 }),
 
