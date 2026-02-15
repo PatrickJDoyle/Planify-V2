@@ -10,6 +10,7 @@ import { ResultsTable } from '@/components/dashboard/results-table';
 import { ResultsGrid } from '@/components/dashboard/results-grid';
 import { Pagination } from '@/components/shared/pagination';
 import { EmptyState } from '@/components/shared/empty-state';
+import { StatisticsPanel } from '@/components/dashboard/statistics-panel';
 import { Separator } from '@/components/ui/separator';
 import { Search } from 'lucide-react';
 
@@ -121,11 +122,15 @@ export default function DashboardPage() {
               </p>
             </div>
           ) : viewMode === 'statistics' ? (
-            <div className="flex h-[500px] items-center justify-center rounded-lg border border-dashed border-border bg-background-subtle">
-              <p className="text-sm text-foreground-muted">
-                Statistics view will be implemented in Phase 5
-              </p>
-            </div>
+            applications.length > 0 ? (
+              <StatisticsPanel applications={applications} />
+            ) : (
+              <div className="flex h-[300px] items-center justify-center rounded-lg border border-dashed border-border bg-background-subtle">
+                <p className="text-sm text-foreground-muted">
+                  Run a search to see statistics for your results.
+                </p>
+              </div>
+            )
           ) : null}
 
           {/* Pagination */}
