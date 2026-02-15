@@ -107,7 +107,7 @@ export function MapSection({ application: app, zoning }: MapSectionProps) {
               style={{ border: 0 }}
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
-              src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAP_API_KEY}&q=${app.latitude},${app.longitude}&zoom=15`}
+              src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&q=${app.latitude},${app.longitude}&zoom=15`}
             />
           </div>
           <div className="mt-2 flex items-center gap-2 text-xs text-foreground-muted">
