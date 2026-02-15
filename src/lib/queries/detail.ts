@@ -73,3 +73,22 @@ export function useZoning(lat: number | undefined, lng: number | undefined) {
     enabled: lat !== undefined && lng !== undefined,
   });
 }
+
+export function useNearbyZoning(
+  lat: number | undefined,
+  lng: number | undefined,
+  delta = 0.06,
+) {
+  return useQuery({
+    queryKey: queryKeys.zoning.bounds(lat ?? 0, lng ?? 0, delta),
+    queryFn: () =>
+      zoningApi.getBounds({
+        north: (lat ?? 0) + delta,
+        south: (lat ?? 0) - delta,
+        east: (lng ?? 0) + delta,
+        west: (lng ?? 0) - delta,
+      }),
+    staleTime: 5 * 60_000,
+    enabled: lat !== undefined && lng !== undefined,
+  });
+}

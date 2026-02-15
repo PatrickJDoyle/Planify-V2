@@ -48,6 +48,8 @@ export const queryKeys = {
   zoning: {
     atPoint: (lat: number, lng: number) =>
       ['zoning', 'point', { lat, lng }] as const,
+    bounds: (lat: number, lng: number, delta: number) =>
+      ['zoning', 'bounds', { lat, lng, delta }] as const,
   },
   user: {
     profile: ['user', 'profile'] as const,

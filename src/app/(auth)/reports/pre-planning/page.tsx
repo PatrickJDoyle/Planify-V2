@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
+import { GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_LOADER_ID } from '@/lib/maps/google-loader';
 import {
   useComputePrePlanningStats,
   useGeneratePrePlanningReport,
@@ -22,9 +23,9 @@ export default function PrePlanningReportsPage() {
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
 
   const { isLoaded } = useJsApiLoader({
-    id: 'pre-planning-places',
+    id: GOOGLE_MAPS_LOADER_ID,
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
-    libraries: ['places'],
+    libraries: GOOGLE_MAPS_LIBRARIES,
   });
 
   const nearbyQuery = useNearbyApplications(coords?.lat ?? null, coords?.lng ?? null, radius);

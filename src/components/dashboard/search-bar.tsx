@@ -13,10 +13,9 @@ import {
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useDashboardStore } from '@/lib/stores/dashboard-store';
+import { GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_LOADER_ID } from '@/lib/maps/google-loader';
 
 type SearchMode = 'address' | 'reference';
-
-const LIBRARIES: ('places')[] = ['places'];
 
 const RADIUS_MIN = 100;
 const RADIUS_MAX = 5000;
@@ -49,8 +48,9 @@ export function SearchBar() {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const { isLoaded } = useJsApiLoader({
+    id: GOOGLE_MAPS_LOADER_ID,
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '',
-    libraries: LIBRARIES,
+    libraries: GOOGLE_MAPS_LIBRARIES,
   });
 
   // Handle place selection from autocomplete

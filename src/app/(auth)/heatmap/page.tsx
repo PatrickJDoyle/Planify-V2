@@ -9,11 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useHeatmapApplications, useHeatmapCommencements, useHeatmapSales } from '@/lib/queries/heatmap';
+import { GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_LOADER_ID } from '@/lib/maps/google-loader';
 import type { HeatmapBounds, HeatmapLayerType } from '@/lib/types/phase5';
 
 const IRELAND_CENTER = { lat: 53.349805, lng: -6.26031 };
-const MAP_LIBRARIES: ('places')[] = ['places'];
-
 export default function HeatmapPage() {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [bounds, setBounds] = useState<HeatmapBounds | undefined>(undefined);
@@ -27,9 +26,9 @@ export default function HeatmapPage() {
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
 
   const { isLoaded } = useJsApiLoader({
-    id: 'heatmap-google-loader',
+    id: GOOGLE_MAPS_LOADER_ID,
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
-    libraries: MAP_LIBRARIES,
+    libraries: GOOGLE_MAPS_LIBRARIES,
   });
 
   const applicationsQuery = useHeatmapApplications(months, bounds);

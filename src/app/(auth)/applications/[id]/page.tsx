@@ -5,7 +5,14 @@ import { useParams } from 'next/navigation';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useApplication, useRelatedApplications } from '@/lib/queries/applications';
-import { useBcmsNotices, useNearbyBcms, useNearbySales, usePropertyHistory, useZoning } from '@/lib/queries/detail';
+import {
+  useBcmsNotices,
+  useNearbyBcms,
+  useNearbySales,
+  useNearbyZoning,
+  usePropertyHistory,
+  useZoning,
+} from '@/lib/queries/detail';
 import { ApplicationHeader } from '@/components/application/application-header';
 import { OverviewSection, OverviewSkeleton } from '@/components/application/overview-section';
 import { DocumentsSection } from '@/components/application/documents-section';
@@ -32,6 +39,7 @@ export default function ApplicationDetailPage() {
     !bcmsLoading && (!bcmsNotices || bcmsNotices.length === 0),
   );
   const { data: zoning } = useZoning(application?.latitude, application?.longitude);
+  const { data: nearbyZones } = useNearbyZoning(application?.latitude, application?.longitude, 0.08);
   const { data: nearbySales, isLoading: salesLoading } = useNearbySales(
     application?.latitude,
     application?.longitude,
@@ -77,7 +85,7 @@ export default function ApplicationDetailPage() {
             </TabsContent>
 
             <TabsContent value="map" className="mt-4">
-              <MapSection application={application} zoning={zoning} />
+              <MapSection application={application} zoning={zoning} nearbyZones={nearbyZones} />
             </TabsContent>
 
             <TabsContent value="timeline" className="mt-4">
