@@ -9,6 +9,7 @@ import {
   Bell,
   Inbox,
   BarChart3,
+  History,
   Map,
   MessageSquare,
   Settings,
@@ -42,6 +43,7 @@ const baseMainNav: Omit<NavItem, 'badge'>[] = [
   { label: 'Alerts', href: '/alerts', icon: Bell },
   { label: 'Inbox', href: '/alerts/inbox', icon: Inbox },
   { label: 'Reports', href: '/reports/pre-planning', icon: BarChart3 },
+  { label: 'Report History', href: '/reports/history', icon: History },
   { label: 'Heatmap', href: '/heatmap', icon: Map },
 ];
 
