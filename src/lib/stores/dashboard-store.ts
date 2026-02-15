@@ -38,7 +38,10 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
   filters: DEFAULT_FILTERS,
   searchMode: 'authority',
   setFilters: (newFilters) =>
-    set((state) => ({ filters: { ...state.filters, ...newFilters } })),
+    set((state) => ({
+      filters: { ...state.filters, ...newFilters },
+      page: 1,
+    })),
   setSearchMode: (mode) => set({ searchMode: mode }),
   resetFilters: () => set({ filters: DEFAULT_FILTERS, page: 1 }),
 

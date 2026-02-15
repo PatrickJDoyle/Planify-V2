@@ -239,6 +239,7 @@ export function Map3DPreview({
           );
         }
         addZoneLayers(map);
+        map.resize();
         setIsLoading(false);
       });
 
@@ -274,6 +275,29 @@ export function Map3DPreview({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latitude, longitude, addZoneLayers]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const container = mapContainerRef.current;
+    if (!map || !container) return;
+
+    const resizeMap = () => {
+      try {
+        map.resize();
+      } catch {
+        // no-op
+      }
+    };
+
+    const observer = new ResizeObserver(() => resizeMap());
+    observer.observe(container);
+    const timer = window.setTimeout(resizeMap, 120);
+
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(timer);
+    };
+  }, [compact]);
 
   useEffect(() => {
     const map = mapRef.current;

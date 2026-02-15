@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { useDashboardStore } from '@/lib/stores/dashboard-store';
-import { useApplications } from '@/lib/queries/applications';
+import { useApplications, useApplicationsAll } from '@/lib/queries/applications';
 import { SearchBar } from '@/components/dashboard/search-bar';
 import { FilterBar } from '@/components/dashboard/filter-bar';
 import { ResultsHeader } from '@/components/dashboard/results-header';
@@ -43,6 +43,11 @@ export default function DashboardPage() {
     data: response,
     isLoading,
   } = useApplications(queryFilters, page, pageSize, hasActiveFilters);
+  const { data: fullStatsResponse } = useApplicationsAll(
+    queryFilters,
+    hasActiveFilters && viewMode === 'statistics',
+    10_000,
+  );
 
   const rawApplications = response?.data ?? [];
   const shouldClientPaginate =
@@ -131,7 +136,10 @@ export default function DashboardPage() {
               </p>
             </div>
           ) : viewMode === 'statistics' ? (
-            <StatisticsView applications={applications} totalResults={totalResults} />
+            <StatisticsView
+              applications={fullStatsResponse?.data ?? applications}
+              totalResults={fullStatsResponse?.total ?? totalResults}
+            />
           ) : null}
 
           {/* Pagination */}

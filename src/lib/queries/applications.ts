@@ -24,6 +24,20 @@ export function useApplications(
   });
 }
 
+export function useApplicationsAll(
+  filters: DashboardFilters,
+  enabled = true,
+  maxRows = 10_000,
+) {
+  return useQuery({
+    queryKey: queryKeys.applications.list(filters, 1, maxRows),
+    queryFn: () => applicationsApi.list(filters, 1, maxRows),
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    enabled,
+  });
+}
+
 export function useApplication(id: number) {
   return useQuery({
     queryKey: queryKeys.applications.detail(id),
