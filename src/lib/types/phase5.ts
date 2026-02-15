@@ -23,6 +23,10 @@ export interface PrePlanningGeneratePayload {
   adjustedRadius: number;
   initialApplicationCount: number;
   address?: string;
+  centreLat?: number;
+  centreLon?: number;
+  intentionCategory?: string;
+  intentionSubCategory?: string;
 }
 
 export interface PrePlanningStatsResponse {

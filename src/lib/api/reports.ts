@@ -3,6 +3,7 @@ import type {
   PrePlanningGeneratePayload,
   PrePlanningStatsResponse,
 } from '@/lib/types/phase5';
+import axios from 'axios';
 
 export interface NearbyApplicationsParams {
   latitude: number;
@@ -49,18 +50,40 @@ export const reportsApi = {
   },
 
   computeStats: async (payload: PrePlanningGeneratePayload): Promise<PrePlanningStatsResponse> => {
-    const { data } = await apiClient.post<PrePlanningStatsResponse>(
-      '/pre-planning/compute-stats',
-      payload,
-    );
-    return data;
+    try {
+      const { data } = await apiClient.post<PrePlanningStatsResponse>(
+        '/pre-planning/compute-stats',
+        payload,
+      );
+      return data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const serverMessage =
+          (error.response?.data as { message?: string } | undefined)?.message ||
+          error.response?.statusText ||
+          error.message;
+        throw new Error(serverMessage);
+      }
+      throw error;
+    }
   },
 
   generate: async (payload: PrePlanningGeneratePayload): Promise<{ content: string }> => {
-    const { data } = await apiClient.post<{ content: string }>(
-      '/pre-planning/generate-report',
-      payload,
-    );
-    return data;
+    try {
+      const { data } = await apiClient.post<{ content: string }>(
+        '/pre-planning/generate-report',
+        payload,
+      );
+      return data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const serverMessage =
+          (error.response?.data as { message?: string } | undefined)?.message ||
+          error.response?.statusText ||
+          error.message;
+        throw new Error(serverMessage);
+      }
+      throw error;
+    }
   },
 };

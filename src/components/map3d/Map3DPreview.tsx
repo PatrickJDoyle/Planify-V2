@@ -30,6 +30,7 @@ export function Map3DPreview({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
   const hasLoadedRef = useRef(false);
+  const activeStyleRef = useRef<'satellite' | 'light'>('light');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [is3DMode, setIs3DMode] = useState(true);
@@ -169,6 +170,7 @@ export function Map3DPreview({
       hasLoadedRef.current = false;
       setIsLoading(true);
       setError(null);
+      activeStyleRef.current = mapStyle;
 
       const map = new mapboxgl.Map({
         container: mapContainerRef.current,
@@ -323,11 +325,14 @@ export function Map3DPreview({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || !hasLoadedRef.current) return;
+    if (activeStyleRef.current === mapStyle) return;
     const styleUrl =
       mapStyle === 'satellite'
         ? 'mapbox://styles/mapbox/satellite-streets-v12'
         : 'mapbox://styles/mapbox/light-v11';
+    activeStyleRef.current = mapStyle;
+    setIsLoading(true);
     map.setStyle(styleUrl);
 
     const onStyleLoad = () => {
@@ -394,6 +399,7 @@ export function Map3DPreview({
         // ignore and let map continue
       }
       addZoneLayers(map);
+      setIsLoading(false);
     };
 
     map.once('style.load', onStyleLoad);
