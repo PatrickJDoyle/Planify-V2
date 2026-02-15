@@ -1,0 +1,140 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* === Brand — Planify Blue === */
+    --brand-50: #e8f2f9;
+    --brand-100: #c5dff0;
+    --brand-200: #9fcbe6;
+    --brand-300: #74b5db;
+    --brand-400: #4a9fd0;
+    --brand-500: #1270AF;
+    --brand-600: #0f5a8f;
+    --brand-700: #0c4670;
+    --brand-800: #093351;
+    --brand-900: #062133;
+
+    /* === Neutrals (Slate) === */
+    --neutral-0: #ffffff;
+    --neutral-50: #f8fafc;
+    --neutral-100: #f1f5f9;
+    --neutral-200: #e2e8f0;
+    --neutral-300: #cbd5e1;
+    --neutral-400: #94a3b8;
+    --neutral-500: #64748b;
+    --neutral-600: #475569;
+    --neutral-700: #334155;
+    --neutral-800: #1e293b;
+    --neutral-900: #0f172a;
+    --neutral-950: #020617;
+
+    /* === Semantic === */
+    --background: var(--neutral-0);
+    --background-subtle: var(--neutral-50);
+    --background-muted: var(--neutral-100);
+    --foreground: var(--neutral-900);
+    --foreground-muted: var(--neutral-500);
+    --foreground-subtle: var(--neutral-400);
+    --border: var(--neutral-200);
+    --border-muted: var(--neutral-100);
+    --ring: var(--brand-500);
+
+    --primary: var(--brand-500);
+    --primary-hover: var(--brand-600);
+    --primary-foreground: #ffffff;
+
+    --destructive: #dc2626;
+    --destructive-foreground: #ffffff;
+
+    --surface: var(--neutral-0);
+    --surface-raised: var(--neutral-0);
+    --surface-overlay: var(--neutral-0);
+
+    /* === Planning Status Colors === */
+    --status-granted: #16a34a;
+    --status-refused: #dc2626;
+    --status-pending: #f59e0b;
+    --status-appealed: #8b5cf6;
+    --status-withdrawn: var(--neutral-400);
+    --status-conditions: #0ea5e9;
+
+    /* === Sidebar === */
+    --sidebar-bg: var(--neutral-900);
+    --sidebar-fg: var(--neutral-200);
+    --sidebar-accent: var(--brand-500);
+    --sidebar-muted: var(--neutral-600);
+    --sidebar-border: var(--neutral-800);
+    --sidebar-width: 240px;
+    --sidebar-collapsed-width: 64px;
+
+    /* === Radius === */
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --radius-xl: 12px;
+  }
+
+  .dark {
+    --background: var(--neutral-950);
+    --background-subtle: var(--neutral-900);
+    --background-muted: var(--neutral-800);
+    --foreground: var(--neutral-50);
+    --foreground-muted: var(--neutral-400);
+    --foreground-subtle: var(--neutral-500);
+    --border: var(--neutral-800);
+    --border-muted: var(--neutral-800);
+
+    --surface: var(--neutral-900);
+    --surface-raised: var(--neutral-800);
+    --surface-overlay: var(--neutral-800);
+
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+
+    --sidebar-bg: var(--neutral-950);
+    --sidebar-border: var(--neutral-800);
+  }
+
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--neutral-300) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: var(--neutral-300);
+    border-radius: 3px;
+  }
+
+  .dark .scrollbar-thin {
+    scrollbar-color: var(--neutral-700) transparent;
+  }
+
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: var(--neutral-700);
+  }
+}
