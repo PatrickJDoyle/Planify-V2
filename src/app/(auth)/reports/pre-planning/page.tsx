@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { useJsApiLoader, Autocomplete } from '@react-google-maps/api';
 import {
   AlertTriangle,
@@ -360,7 +359,6 @@ export default function PrePlanningReportsPage() {
   const [activeJobId, setActiveJobId] = useState<number | null>(null);
   const [isHydratingJob, setIsHydratingJob] = useState(false);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
-  const searchParams = useSearchParams();
 
   const categories = useMemo(() => getAllPlanningCategories(), []);
   const subCategories = useMemo(() => getPlanningSubCategories(intentionCategory), [intentionCategory]);
@@ -620,7 +618,9 @@ export default function PrePlanningReportsPage() {
   };
 
   useEffect(() => {
-    const jobIdParam = searchParams.get('jobId');
+    if (typeof window === 'undefined') return;
+
+    const jobIdParam = new URLSearchParams(window.location.search).get('jobId');
     if (!jobIdParam) return;
     const parsed = Number.parseInt(jobIdParam, 10);
     if (!Number.isFinite(parsed)) return;
@@ -648,7 +648,7 @@ export default function PrePlanningReportsPage() {
     return () => {
       cancelled = true;
     };
-  }, [searchParams, activeJobId]);
+  }, [activeJobId]);
 
   const { isLoaded } = useJsApiLoader({
     id: GOOGLE_MAPS_LOADER_ID,
