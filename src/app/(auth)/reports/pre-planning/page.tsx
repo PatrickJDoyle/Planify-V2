@@ -3,6 +3,20 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { useJsApiLoader, Autocomplete } from '@react-google-maps/api';
 import { AlertTriangle, FileText, Loader2, MapPin, Sparkles } from 'lucide-react';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,6 +27,64 @@ import { GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_LOADER_ID } from '@/lib/maps/google-
 import { reportsApi } from '@/lib/api/reports';
 import { getAllPlanningCategories, getPlanningSubCategories } from '@/lib/constants/planning-intentions';
 import type { PrePlanningStatsResponse } from '@/lib/types/phase5';
+
+type NormalizedApp = {
+  applicationNumber: string;
+  planningAuthority: string;
+  decision: string;
+  receivedDate: string;
+  applicationType: string;
+  address: string;
+};
+
+type ChartDatum = {
+  name: string;
+  value: number;
+};
+
+const STATUS_COLORS = ['#1270AF', '#16a34a', '#dc2626', '#f59e0b', '#64748b', '#7c3aed'];
+
+function normalizeApp(raw: unknown): NormalizedApp {
+  const app = raw as Record<string, unknown>;
+  return {
+    applicationNumber: String(app.ApplicationNumber ?? app.applicationNumber ?? 'N/A'),
+    planningAuthority: String(app.PlanningAuthority ?? app.planningAuthority ?? 'Unknown'),
+    decision: String(app.Decision ?? app.decision ?? 'Pending'),
+    receivedDate: String(app.ReceivedDate ?? app.receivedDate ?? ''),
+    applicationType: String(app.ApplicationType ?? app.applicationType ?? 'Other'),
+    address: String(app.DevelopmentAddress ?? app.developmentAddress ?? 'Unknown address'),
+  };
+}
+
+function extractSectionedHtml(content: string): string {
+  if (!content) return '';
+  if (/<h[1-6][\s>]/i.test(content)) return content;
+  const titles = [
+    'Executive Summary',
+    'Planning Activity Analysis',
+    'Decision Analysis',
+    'Development Trends',
+    'Key Metrics Summary',
+    'Recommendations',
+    'Assumptions & Limitations',
+  ];
+  let formatted = content;
+  titles.forEach((title) => {
+    const reg = new RegExp(`(^|\\n)${title}(\\n|:)`, 'gi');
+    formatted = formatted.replace(reg, `\n<h2>${title}</h2>\n`);
+  });
+  const paragraphs = formatted
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => {
+      if (p.startsWith('<h2>') || p.startsWith('<h3>') || p.startsWith('<table') || p.startsWith('<ul')) {
+        return p;
+      }
+      return `<p>${p.replace(/\n/g, '<br/>')}</p>`;
+    });
+  return paragraphs.join('\n');
+}
 
 export default function PrePlanningReportsPage() {
   const [address, setAddress] = useState('');
@@ -30,12 +102,88 @@ export default function PrePlanningReportsPage() {
   const [statsData, setStatsData] = useState<PrePlanningStatsResponse | null>(null);
   const [isRunningReport, setIsRunningReport] = useState(false);
   const [isFetchingNearby, setIsFetchingNearby] = useState(false);
+  const [applicationPage, setApplicationPage] = useState(1);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const categories = useMemo(() => getAllPlanningCategories(), []);
   const subCategories = useMemo(
     () => getPlanningSubCategories(intentionCategory),
     [intentionCategory],
   );
+  const normalizedApplications = useMemo(
+    () => effectiveApplications.map((app) => normalizeApp(app)),
+    [effectiveApplications],
+  );
+
+  const kpis = useMemo(() => {
+    const total = normalizedApplications.length;
+    const granted = normalizedApplications.filter((a) =>
+      a.decision.toUpperCase().includes('GRANT') ||
+      a.decision.toUpperCase().includes('APPROVAL'),
+    ).length;
+    const refused = normalizedApplications.filter((a) =>
+      a.decision.toUpperCase().includes('REFUSE'),
+    ).length;
+    const pending = normalizedApplications.filter((a) =>
+      !a.decision || a.decision.toUpperCase().includes('PENDING'),
+    ).length;
+    const approvalRate = granted + refused > 0 ? Math.round((granted / (granted + refused)) * 1000) / 10 : 0;
+    return { total, granted, refused, pending, approvalRate };
+  }, [normalizedApplications]);
+
+  const decisionsData = useMemo<ChartDatum[]>(() => {
+    const grouped = new Map<string, number>();
+    normalizedApplications.forEach((app) => {
+      const decision = app.decision || 'Pending';
+      grouped.set(decision, (grouped.get(decision) ?? 0) + 1);
+    });
+    return Array.from(grouped.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([name, value]) => ({ name, value }));
+  }, [normalizedApplications]);
+
+  const authorityData = useMemo<ChartDatum[]>(() => {
+    const grouped = new Map<string, number>();
+    normalizedApplications.forEach((app) => {
+      grouped.set(app.planningAuthority, (grouped.get(app.planningAuthority) ?? 0) + 1);
+    });
+    return Array.from(grouped.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([name, value]) => ({ name, value }));
+  }, [normalizedApplications]);
+
+  const typeData = useMemo<ChartDatum[]>(() => {
+    const grouped = new Map<string, number>();
+    normalizedApplications.forEach((app) => {
+      grouped.set(app.applicationType, (grouped.get(app.applicationType) ?? 0) + 1);
+    });
+    return Array.from(grouped.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([name, value]) => ({ name, value }));
+  }, [normalizedApplications]);
+
+  const monthlyData = useMemo<ChartDatum[]>(() => {
+    const grouped = new Map<string, number>();
+    normalizedApplications.forEach((app) => {
+      const dt = new Date(app.receivedDate);
+      if (Number.isNaN(dt.getTime())) return;
+      const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+      grouped.set(key, (grouped.get(key) ?? 0) + 1);
+    });
+    return Array.from(grouped.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-24)
+      .map(([name, value]) => ({ name, value }));
+  }, [normalizedApplications]);
+
+  const applicationPageSize = 20;
+  const pagedApplications = useMemo(() => {
+    const start = (applicationPage - 1) * applicationPageSize;
+    return normalizedApplications.slice(start, start + applicationPageSize);
+  }, [applicationPage, normalizedApplications]);
+  const totalAppPages = Math.max(1, Math.ceil(normalizedApplications.length / applicationPageSize));
 
   const { isLoaded } = useJsApiLoader({
     id: GOOGLE_MAPS_LOADER_ID,
@@ -121,6 +269,7 @@ export default function PrePlanningReportsPage() {
       setInitialCount(optimal.initialCount ?? selectedApps.length);
       setEffectiveRadius(optimal.adjustedRadius ?? radius);
       setEffectiveApplications(selectedApps);
+      setApplicationPage(1);
 
       const payload = {
         applications: selectedApps,
@@ -305,18 +454,122 @@ export default function PrePlanningReportsPage() {
             </div>
             <Tabs defaultValue="report">
               <TabsList className="mb-3">
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="charts">Charts</TabsTrigger>
                 <TabsTrigger value="report">AI Report</TabsTrigger>
                 <TabsTrigger value="stats">Stats</TabsTrigger>
                 <TabsTrigger value="applications">Applications</TabsTrigger>
+                <TabsTrigger value="bcms">BCMS</TabsTrigger>
+                <TabsTrigger value="sales">Sales</TabsTrigger>
+                <TabsTrigger value="zoning">Zoning</TabsTrigger>
               </TabsList>
+
+              <TabsContent value="overview" className="mt-0">
+                <div className="min-h-[520px] space-y-4 rounded-md border border-border bg-background-subtle p-4">
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                    <Card><CardContent className="p-4"><p className="text-xs text-foreground-muted">Applications</p><p className="text-xl font-semibold">{kpis.total}</p></CardContent></Card>
+                    <Card><CardContent className="p-4"><p className="text-xs text-foreground-muted">Granted</p><p className="text-xl font-semibold text-green-600">{kpis.granted}</p></CardContent></Card>
+                    <Card><CardContent className="p-4"><p className="text-xs text-foreground-muted">Refused</p><p className="text-xl font-semibold text-red-600">{kpis.refused}</p></CardContent></Card>
+                    <Card><CardContent className="p-4"><p className="text-xs text-foreground-muted">Pending</p><p className="text-xl font-semibold text-amber-600">{kpis.pending}</p></CardContent></Card>
+                    <Card><CardContent className="p-4"><p className="text-xs text-foreground-muted">Approval Rate</p><p className="text-xl font-semibold">{kpis.approvalRate}%</p></CardContent></Card>
+                  </div>
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm">Professional Scope Summary</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm text-foreground-muted">
+                      <p>
+                        Address: <span className="font-medium text-foreground">{address || 'Not selected'}</span>
+                      </p>
+                      <p>
+                        Development intent: <span className="font-medium text-foreground">{intentionCategory || 'N/A'}{intentionSubCategory ? ` -> ${intentionSubCategory}` : ''}</span>
+                      </p>
+                      <p>
+                        Radius strategy:{' '}
+                        <span className="font-medium text-foreground">
+                          {'500m seed -> '}
+                          {effectiveRadius}
+                          m effective
+                        </span>
+                      </p>
+                      <p>
+                        Initial count: <span className="font-medium text-foreground">{initialCount || '—'}</span>
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="charts" className="mt-0">
+                <div className="min-h-[520px] space-y-4 rounded-md border border-border bg-background-subtle p-4">
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm">Decision Mix</CardTitle></CardHeader>
+                      <CardContent className="h-[280px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie data={decisionsData} dataKey="value" nameKey="name" outerRadius={95} label>
+                              {decisionsData.map((entry, index) => (
+                                <Cell key={`${entry.name}-${index}`} fill={STATUS_COLORS[index % STATUS_COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm">Applications Over Time</CardTitle></CardHeader>
+                      <CardContent className="h-[280px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={monthlyData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" />
+                            <YAxis allowDecimals={false} />
+                            <Tooltip />
+                            <Line type="monotone" dataKey="value" stroke="#1270AF" strokeWidth={2} dot={false} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm">Top Planning Authorities</CardTitle></CardHeader>
+                      <CardContent className="h-[320px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={authorityData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" hide />
+                            <YAxis allowDecimals={false} />
+                            <Tooltip />
+                            <Bar dataKey="value" fill="#1270AF" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm">Application Type Mix</CardTitle></CardHeader>
+                      <CardContent className="h-[320px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={typeData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" hide />
+                            <YAxis allowDecimals={false} />
+                            <Tooltip />
+                            <Bar dataKey="value" fill="#0ea5e9" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              </TabsContent>
 
               <TabsContent value="report" className="mt-0">
                 <div className="min-h-[520px] rounded-md border border-border bg-background-subtle p-4">
                   {reportHtml ? (
                     <div
                       className="prose prose-sm max-w-none text-foreground dark:prose-invert"
-                      // Backend already returns generated HTML report.
-                      dangerouslySetInnerHTML={{ __html: reportHtml }}
+                      dangerouslySetInnerHTML={{ __html: extractSectionedHtml(reportHtml) }}
                     />
                   ) : (
                     <p className="text-sm text-foreground-muted">
@@ -379,7 +632,7 @@ export default function PrePlanningReportsPage() {
 
               <TabsContent value="applications" className="mt-0">
                 <div className="min-h-[520px] rounded-md border border-border bg-background-subtle p-4">
-                  {effectiveApplications.length > 0 ? (
+                  {normalizedApplications.length > 0 ? (
                     <div className="overflow-x-auto rounded-md border border-border bg-surface">
                       <table className="w-full text-left text-xs">
                         <thead className="border-b border-border bg-background-subtle">
@@ -391,22 +644,167 @@ export default function PrePlanningReportsPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {effectiveApplications.slice(0, 75).map((raw, idx) => {
-                            const app = raw as Record<string, unknown>;
-                            return (
-                              <tr key={`${String(app.ApplicationNumber ?? app.applicationNumber ?? idx)}-${idx}`} className="border-b border-border/70">
-                                <td className="px-3 py-2">{String(app.ApplicationNumber ?? app.applicationNumber ?? 'N/A')}</td>
-                                <td className="px-3 py-2">{String(app.PlanningAuthority ?? app.planningAuthority ?? 'N/A')}</td>
-                                <td className="px-3 py-2">{String(app.Decision ?? app.decision ?? 'Pending')}</td>
-                                <td className="px-3 py-2">{String(app.ReceivedDate ?? app.receivedDate ?? 'N/A')}</td>
-                              </tr>
-                            );
-                          })}
+                          {pagedApplications.map((app, idx) => (
+                            <tr key={`${app.applicationNumber}-${idx}`} className="border-b border-border/70">
+                              <td className="px-3 py-2">{app.applicationNumber}</td>
+                              <td className="px-3 py-2">{app.planningAuthority}</td>
+                              <td className="px-3 py-2">{app.decision}</td>
+                              <td className="px-3 py-2">{app.receivedDate || 'N/A'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <div className="flex items-center justify-between border-t border-border px-3 py-2 text-xs">
+                        <span>Page {applicationPage} of {totalAppPages}</span>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={applicationPage <= 1}
+                            onClick={() => setApplicationPage((p) => Math.max(1, p - 1))}
+                          >
+                            Previous
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={applicationPage >= totalAppPages}
+                            onClick={() => setApplicationPage((p) => Math.min(totalAppPages, p + 1))}
+                          >
+                            Next
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-foreground-muted">No applications loaded yet.</p>
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="bcms" className="mt-0">
+                <div className="min-h-[520px] rounded-md border border-border bg-background-subtle p-4">
+                  {Array.isArray((statsData as any)?.bcmsRecords) && (statsData as any).bcmsRecords.length > 0 ? (
+                    <div className="overflow-x-auto rounded-md border border-border bg-surface">
+                      <table className="w-full text-left text-xs">
+                        <thead className="border-b border-border bg-background-subtle">
+                          <tr>
+                            <th className="px-3 py-2 font-semibold">Notice</th>
+                            <th className="px-3 py-2 font-semibold">Authority</th>
+                            <th className="px-3 py-2 font-semibold">Status</th>
+                            <th className="px-3 py-2 font-semibold">Commencement</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(statsData as any).bcmsRecords.slice(0, 100).map((row: Record<string, unknown>, idx: number) => (
+                            <tr key={`${String(row.id ?? idx)}-${idx}`} className="border-b border-border/70">
+                              <td className="px-3 py-2">{String(row.noticeExternalId ?? 'N/A')}</td>
+                              <td className="px-3 py-2">{String(row.localAuthority ?? 'N/A')}</td>
+                              <td className="px-3 py-2">{String(row.status ?? 'N/A')}</td>
+                              <td className="px-3 py-2">{String(row.commencementDate ?? 'N/A')}</td>
+                            </tr>
+                          ))}
                         </tbody>
                       </table>
                     </div>
                   ) : (
-                    <p className="text-sm text-foreground-muted">No applications loaded yet.</p>
+                    <p className="text-sm text-foreground-muted">No BCMS evidence returned for this scope.</p>
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="sales" className="mt-0">
+                <div className="min-h-[520px] space-y-4 rounded-md border border-border bg-background-subtle p-4">
+                  {Array.isArray((statsData as any)?.propertySalesRecords) &&
+                  (statsData as any).propertySalesRecords.length > 0 ? (
+                    <>
+                      <Card>
+                        <CardHeader className="pb-2"><CardTitle className="text-sm">Property Sales Values</CardTitle></CardHeader>
+                        <CardContent className="h-[260px]">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart
+                              data={(statsData as any).propertySalesRecords
+                                .slice(0, 60)
+                                .map((s: Record<string, unknown>) => ({
+                                  name: String(s.saleDate ?? '').slice(0, 10),
+                                  value: Number(s.price ?? 0),
+                                }))}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" hide />
+                              <YAxis />
+                              <Tooltip />
+                              <Line type="monotone" dataKey="value" stroke="#16a34a" strokeWidth={2} dot={false} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </CardContent>
+                      </Card>
+                      <div className="overflow-x-auto rounded-md border border-border bg-surface">
+                        <table className="w-full text-left text-xs">
+                          <thead className="border-b border-border bg-background-subtle">
+                            <tr>
+                              <th className="px-3 py-2 font-semibold">Date</th>
+                              <th className="px-3 py-2 font-semibold">Address</th>
+                              <th className="px-3 py-2 font-semibold">Price</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(statsData as any).propertySalesRecords.slice(0, 100).map((row: Record<string, unknown>, idx: number) => (
+                              <tr key={`${String(row.id ?? idx)}-${idx}`} className="border-b border-border/70">
+                                <td className="px-3 py-2">{String(row.saleDate ?? 'N/A')}</td>
+                                <td className="px-3 py-2">{String(row.address ?? 'N/A')}</td>
+                                <td className="px-3 py-2">EUR {Number(row.price ?? 0).toLocaleString()}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-sm text-foreground-muted">No property sales evidence returned for this scope.</p>
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="zoning" className="mt-0">
+                <div className="min-h-[520px] space-y-4 rounded-md border border-border bg-background-subtle p-4">
+                  {(statsData as any)?.zoning?.hasPrimaryZone ? (
+                    <>
+                      <Card>
+                        <CardHeader className="pb-2"><CardTitle className="text-sm">Primary Zone</CardTitle></CardHeader>
+                        <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
+                          <p><span className="text-foreground-muted">Code:</span> {String((statsData as any)?.zoning?.primaryZone?.zoneGzt ?? 'N/A')}</p>
+                          <p><span className="text-foreground-muted">Authority:</span> {String((statsData as any)?.zoning?.primaryZone?.laName ?? 'N/A')}</p>
+                          <p className="sm:col-span-2"><span className="text-foreground-muted">Description:</span> {String((statsData as any)?.zoning?.primaryZone?.zoneDesc ?? 'N/A')}</p>
+                        </CardContent>
+                      </Card>
+                      {Array.isArray((statsData as any)?.zoning?.zoneTypeDistribution) &&
+                      (statsData as any).zoning.zoneTypeDistribution.length > 0 && (
+                        <Card>
+                          <CardHeader className="pb-2"><CardTitle className="text-sm">Nearby Zone Distribution</CardTitle></CardHeader>
+                          <CardContent className="h-[260px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart
+                                data={(statsData as any).zoning.zoneTypeDistribution.map(
+                                  (z: Record<string, unknown>) => ({
+                                    name: String(z.type ?? 'Unknown'),
+                                    value: Number(z.count ?? 0),
+                                  }),
+                                )}
+                              >
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="name" hide />
+                                <YAxis />
+                                <Tooltip />
+                                <Bar dataKey="value" fill="#7c3aed" />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-sm text-foreground-muted">No zoning evidence returned for this scope.</p>
                   )}
                 </div>
               </TabsContent>
