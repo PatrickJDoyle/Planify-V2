@@ -1,11 +1,12 @@
 import { apiClient } from './client';
+import type { BillingEntrypointResponse } from '@/lib/types/phase5';
 
 export const billingApi = {
-  getEntrypoint: (returnUrl?: string) =>
-    apiClient
-      .post<{ url: string; type: 'checkout' | 'portal' }>(
-        '/users/billing/entrypoint',
-        { returnUrl: returnUrl ?? typeof window !== 'undefined' ? window.location.origin : undefined },
-      )
-      .then((r) => r.data),
+  getEntrypoint: async (returnUrl?: string): Promise<BillingEntrypointResponse> => {
+    const { data } = await apiClient.post<BillingEntrypointResponse>(
+      '/users/billing/entrypoint',
+      { returnUrl },
+    );
+    return data;
+  },
 };

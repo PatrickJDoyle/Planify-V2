@@ -1,151 +1,192 @@
 'use client';
 
-import { Autocomplete, useJsApiLoader } from '@react-google-maps/api';
-import { FileText, Loader2, MapPin } from 'lucide-react';
-import { useCallback, useRef, useState } from 'react';
-
+import React, { useMemo, useRef, useState } from 'react';
+import { useJsApiLoader, Autocomplete } from '@react-google-maps/api';
+import { FileText, Loader2, MapPin, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { prePlanningApi } from '@/lib/api/pre-planning';
+import { Slider } from '@/components/ui/slider';
+import {
+  useComputePrePlanningStats,
+  useGeneratePrePlanningReport,
+  useNearbyApplications,
+  useOptimalRadius,
+} from '@/lib/queries/reports';
 
-export default function PrePlanningReportPage() {
+export default function PrePlanningReportsPage() {
   const [address, setAddress] = useState('');
-  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [applications, setApplications] = useState<unknown[]>([]);
-  const [totalApps, setTotalApps] = useState<number | null>(null);
-  const [optimalRadius, setOptimalRadius] = useState<number | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [reportContent, setReportContent] = useState<string | null>(null);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [radius, setRadius] = useState(1000);
+  const [reportText, setReportText] = useState('');
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
 
   const { isLoaded } = useJsApiLoader({
-    id: 'google-map-script',
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '',
+    id: 'pre-planning-places',
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
     libraries: ['places'],
   });
 
-  const onAutocompleteLoad = useCallback((autocomplete: google.maps.places.Autocomplete) => {
+  const nearbyQuery = useNearbyApplications(coords?.lat ?? null, coords?.lng ?? null, radius);
+  const optimalQuery = useOptimalRadius(coords?.lat ?? null, coords?.lng ?? null);
+  const statsMutation = useComputePrePlanningStats();
+  const generateMutation = useGeneratePrePlanningReport();
+
+  const nearbyCount = Array.isArray(nearbyQuery.data) ? nearbyQuery.data.length : 0;
+  const optimalCount = optimalQuery.data?.initialCount ?? null;
+  const effectiveRadius = optimalQuery.data?.adjustedRadius ?? radius;
+
+  const payload = useMemo(() => {
+    const applications =
+      optimalQuery.data?.applications && optimalQuery.data.applications.length > 0
+        ? optimalQuery.data.applications
+        : nearbyQuery.data ?? [];
+
+    return {
+      applications,
+      initialRadius: radius,
+      adjustedRadius: effectiveRadius,
+      initialApplicationCount: optimalCount ?? nearbyCount,
+      address: address || undefined,
+    };
+  }, [address, effectiveRadius, nearbyCount, nearbyQuery.data, optimalCount, optimalQuery.data, radius]);
+
+  const onAutocompleteLoad = (autocomplete: google.maps.places.Autocomplete) => {
     autocompleteRef.current = autocomplete;
     autocomplete.setComponentRestrictions({ country: 'ie' });
-  }, []);
+  };
 
-  const onPlaceChanged = useCallback(() => {
+  const onPlaceChanged = () => {
     const place = autocompleteRef.current?.getPlace();
-    if (place?.geometry?.location) {
-      const lat = place.geometry.location.lat();
-      const lng = place.geometry.location.lng();
-      setLocation({ lat, lng });
-      setAddress(place.formatted_address ?? place.name ?? '');
-    }
-  }, []);
-
-  const handleAnalyse = async () => {
+    const location = place?.geometry?.location;
     if (!location) return;
-    setLoading(true);
-    setReportContent(null);
-    try {
-      const [optimal, nearby] = await Promise.all([
-        prePlanningApi.getOptimalRadius({
-          latitude: location.lat,
-          longitude: location.lng,
-        }),
-        prePlanningApi.getNearbyApplications({
-          latitude: location.lat,
-          longitude: location.lng,
-          radius: 500,
-          pageSize: 50,
-        }),
-      ]);
-      setOptimalRadius(optimal.optimalRadius);
-      setApplications(nearby.data ?? []);
-      setTotalApps(nearby.total ?? 0);
-    } catch {
-      setApplications([]);
-      setTotalApps(0);
-      setOptimalRadius(null);
-    } finally {
-      setLoading(false);
-    }
+
+    setCoords({ lat: location.lat(), lng: location.lng() });
+    setAddress(place.formatted_address || place.name || '');
+    setReportText('');
   };
 
-  const handleGenerateReport = () => {
-    if (!location || applications.length === 0) return;
-    setReportContent(
-      `Pre-planning analysis for ${address}\n\n` +
-        `${totalApps ?? 0} planning applications found within ${optimalRadius ?? 500}m.\n\n` +
-        'Full AI-powered report generation is available in the full version. ' +
-        'This preview shows the data scope for your selected location.',
-    );
+  const handleComputeStats = async () => {
+    const response = await statsMutation.mutateAsync(payload);
+    const appSummary = response.applications
+      ? JSON.stringify(response.applications, null, 2)
+      : 'No application summary returned.';
+    setReportText(`Pre-Planning Stats\n\n${appSummary}`);
   };
 
-  if (!isLoaded) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-brand-500" />
-      </div>
-    );
-  }
+  const handleGenerateReport = async () => {
+    const response = await generateMutation.mutateAsync(payload);
+    setReportText(response.content || 'Report generated, but no content returned.');
+  };
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-8">
-      <h1 className="mb-6 text-xl font-semibold text-foreground">
-        Pre-Planning Report
-      </h1>
+    <div className="mx-auto w-full max-w-7xl p-6">
+      <div className="mb-5">
+        <h1 className="text-2xl font-semibold text-foreground">Pre-Planning Reports</h1>
+        <p className="mt-1 text-sm text-foreground-muted">
+          Select a location, set a radius, and generate analysis-ready pre-planning outputs.
+        </p>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <MapPin className="h-5 w-5" />
-            Select Location
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-2">
-            <Autocomplete onLoad={onAutocompleteLoad} onPlaceChanged={onPlaceChanged}>
-              <Input
-                placeholder="Search address in Ireland..."
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                className="flex-1"
-              />
-            </Autocomplete>
-            <Button onClick={handleAnalyse} disabled={!location || loading}>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
-              {loading ? 'Analysing...' : 'Analyse'}
-            </Button>
-          </div>
-
-          {optimalRadius != null && totalApps != null && (
-            <p className="mt-4 text-sm text-foreground-muted">
-              Optimal radius: {optimalRadius}m · {totalApps} applications found
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
-      {applications.length > 0 && (
-        <Card className="mt-6">
+      <div className="grid gap-4 lg:grid-cols-[420px_1fr]">
+        <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <FileText className="h-5 w-5" />
-              Report
-            </CardTitle>
+            <CardTitle>Report Scope</CardTitle>
+            <CardDescription>Address + radius controls for report generation.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <Button onClick={handleGenerateReport} className="mb-4">
-              Generate Report
-            </Button>
-            {reportContent && (
-              <div className="prose prose-sm max-w-none rounded-md border border-border bg-background-subtle p-4">
-                <pre className="whitespace-pre-wrap text-sm text-foreground">
-                  {reportContent}
-                </pre>
+          <CardContent className="space-y-5">
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-foreground-muted">Address (Ireland)</label>
+              {isLoaded ? (
+                <Autocomplete onLoad={onAutocompleteLoad} onPlaceChanged={onPlaceChanged}>
+                  <Input
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Search address..."
+                  />
+                </Autocomplete>
+              ) : (
+                <Input disabled placeholder="Loading Google Places..." />
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-foreground-muted">Radius</label>
+                <span className="text-xs font-semibold text-foreground">{radius}m</span>
               </div>
-            )}
+              <Slider
+                value={[radius]}
+                onValueChange={(values) => setRadius(values[0] ?? 1000)}
+                min={100}
+                max={5000}
+                step={100}
+              />
+            </div>
+
+            <div className="rounded-md border border-border bg-background-subtle p-3 text-xs text-foreground-muted">
+              {coords ? (
+                <div className="space-y-1">
+                  <p className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> Selected point</p>
+                  <p>{coords.lat.toFixed(6)}, {coords.lng.toFixed(6)}</p>
+                </div>
+              ) : (
+                <p>Select an address to begin.</p>
+              )}
+            </div>
+
+            <div className="grid gap-2">
+              <Button onClick={() => nearbyQuery.refetch()} disabled={!coords || nearbyQuery.isFetching}>
+                {nearbyQuery.isFetching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Find Nearby Applications
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => optimalQuery.refetch()}
+                disabled={!coords || optimalQuery.isFetching}
+              >
+                {optimalQuery.isFetching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Get Optimal Radius
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={handleComputeStats}
+                disabled={payload.applications.length === 0 || statsMutation.isPending}
+              >
+                {statsMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                Compute Stats
+              </Button>
+              <Button
+                onClick={handleGenerateReport}
+                disabled={payload.applications.length === 0 || generateMutation.isPending}
+              >
+                {generateMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+                Generate Report
+              </Button>
+            </div>
           </CardContent>
         </Card>
-      )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Output</CardTitle>
+            <CardDescription>
+              Nearby: {nearbyCount} apps • Optimal radius count: {optimalCount ?? '—'} • Effective radius: {effectiveRadius}m
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="min-h-[520px] rounded-md border border-border bg-background-subtle p-4">
+              {reportText ? (
+                <pre className="whitespace-pre-wrap text-sm text-foreground">{reportText}</pre>
+              ) : (
+                <p className="text-sm text-foreground-muted">
+                  No report generated yet. Run a nearby search, then compute stats or generate a report.
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

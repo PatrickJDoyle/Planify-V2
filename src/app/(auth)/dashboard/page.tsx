@@ -8,9 +8,9 @@ import { FilterBar } from '@/components/dashboard/filter-bar';
 import { ResultsHeader } from '@/components/dashboard/results-header';
 import { ResultsTable } from '@/components/dashboard/results-table';
 import { ResultsGrid } from '@/components/dashboard/results-grid';
+import { StatisticsView } from '@/components/dashboard/statistics-view';
 import { Pagination } from '@/components/shared/pagination';
 import { EmptyState } from '@/components/shared/empty-state';
-import { StatisticsPanel } from '@/components/dashboard/statistics-panel';
 import { Separator } from '@/components/ui/separator';
 import { Search } from 'lucide-react';
 
@@ -118,19 +118,11 @@ export default function DashboardPage() {
           ) : viewMode === 'map' ? (
             <div className="flex h-[500px] items-center justify-center rounded-lg border border-dashed border-border bg-background-subtle">
               <p className="text-sm text-foreground-muted">
-                Map view will be implemented in Phase 3
+                Use the dedicated Heatmap page for spatial analysis.
               </p>
             </div>
           ) : viewMode === 'statistics' ? (
-            applications.length > 0 ? (
-              <StatisticsPanel applications={applications} />
-            ) : (
-              <div className="flex h-[300px] items-center justify-center rounded-lg border border-dashed border-border bg-background-subtle">
-                <p className="text-sm text-foreground-muted">
-                  Run a search to see statistics for your results.
-                </p>
-              </div>
-            )
+            <StatisticsView applications={applications} totalResults={totalResults} />
           ) : null}
 
           {/* Pagination */}

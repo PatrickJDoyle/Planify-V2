@@ -4,7 +4,7 @@ import React from 'react';
 import {
   FileInput, FileQuestion, FileCheck, Gavel, Calendar,
   BadgeCheck, Timer, XCircle, Scale, Construction, Building2,
-  ExternalLink
+  MapPin, ExternalLink,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -109,14 +109,22 @@ export function OverviewSection({ application: app, bcmsNotices }: OverviewSecti
           </CardContent>
         </Card>
 
-        {/* Street View — embedded in-app (no external links) */}
+        {/* Street View */}
         {streetViewUrl && (
           <Card>
             <CardContent className="p-4">
-              <h3 className="text-sm font-semibold text-foreground">Location Preview</h3>
-              <p className="mt-1 text-xs text-foreground-muted">
-                View interactive maps in the Map tab
-              </p>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-foreground">Location</h3>
+                <a
+                  href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${app.latitude},${app.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-xs text-primary hover:underline"
+                >
+                  <MapPin className="h-3 w-3" />
+                  Open Street View
+                </a>
+              </div>
               <div className="mt-3 overflow-hidden rounded-md">
                 <img
                   src={streetViewUrl}

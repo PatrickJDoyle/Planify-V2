@@ -22,6 +22,20 @@ export const queryKeys = {
       ['alerts', 'inbox', filters] as const,
     unreadCount: ['alerts', 'unread-count'] as const,
   },
+  heatmap: {
+    applications: (months: number, boundsKey: string) =>
+      ['heatmap', 'applications', { months, boundsKey }] as const,
+    commencements: (months: number, boundsKey: string) =>
+      ['heatmap', 'commencements', { months, boundsKey }] as const,
+    sales: (months: number, boundsKey: string) =>
+      ['heatmap', 'sales', { months, boundsKey }] as const,
+  },
+  reports: {
+    nearby: (lat: number, lng: number, radius: number) =>
+      ['reports', 'nearby', { lat, lng, radius }] as const,
+    optimal: (lat: number, lng: number) =>
+      ['reports', 'optimal', { lat, lng }] as const,
+  },
   bcms: {
     byApplication: (appId: number) => ['bcms', 'application', appId] as const,
     nearby: (appId: number) => ['bcms', 'nearby', appId] as const,

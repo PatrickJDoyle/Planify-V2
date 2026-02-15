@@ -1,49 +1,68 @@
 'use client';
 
-import { useUser } from '@clerk/nextjs';
-import { User } from 'lucide-react';
-
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React from 'react';
+import Link from 'next/link';
+import { Bell, CreditCard, MapPinned, UserCog } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { useUserProfile } from '@/lib/queries/user';
 
 export default function SettingsPage() {
-  const { user } = useUser();
-  const { data: profile } = useUserProfile();
+  const { profile } = useUserProfile();
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-8">
-      <h1 className="mb-6 text-xl font-semibold text-foreground">Settings</h1>
+    <div className="mx-auto w-full max-w-6xl p-6">
+      <div className="mb-5">
+        <h1 className="text-2xl font-semibold text-foreground">Settings</h1>
+        <p className="mt-1 text-sm text-foreground-muted">
+          Manage account, billing, locations, and notification preferences.
+        </p>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <User className="h-5 w-5" />
-            Account
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <p className="text-xs font-medium text-foreground-muted">Name</p>
-            <p className="text-sm text-foreground">
-              {user?.fullName ?? '—'}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs font-medium text-foreground-muted">Email</p>
-            <p className="text-sm text-foreground">
-              {user?.primaryEmailAddress?.emailAddress ?? profile?.email ?? '—'}
-            </p>
-          </div>
-          {profile?.subscriptionTier && (
-            <div>
-              <p className="text-xs font-medium text-foreground-muted">Plan</p>
-              <p className="text-sm text-foreground capitalize">
-                {profile.subscriptionTier}
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><UserCog className="h-4 w-4" /> Account</CardTitle>
+            <CardDescription>Profile and organization details.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <p><span className="text-foreground-muted">Email:</span> {profile?.email ?? 'N/A'}</p>
+            <p><span className="text-foreground-muted">Tier:</span> {profile?.subscriptionTier ?? 'free'}</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><CreditCard className="h-4 w-4" /> Billing</CardTitle>
+            <CardDescription>Upgrade and manage subscription.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline" className="w-full sm:w-auto">
+              <Link href="/billing">Open Billing</Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><MapPinned className="h-4 w-4" /> Location Preferences</CardTitle>
+            <CardDescription>Saved locations and radius defaults.</CardDescription>
+          </CardHeader>
+          <CardContent className="text-sm text-foreground-muted">
+            Location preference editor is scheduled for the next pass.
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Bell className="h-4 w-4" /> Notifications</CardTitle>
+            <CardDescription>Alert and inbox preference controls.</CardDescription>
+          </CardHeader>
+          <CardContent className="text-sm text-foreground-muted">
+            Notification preference controls are scheduled for the next pass.
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

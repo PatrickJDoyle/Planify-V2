@@ -1,42 +1,35 @@
 import { apiClient } from './client';
+import type { HeatmapBounds, HeatmapPoint } from '@/lib/types/phase5';
 
-export interface HeatmapDataPoint {
-  coordinates: [number, number];
-  weight: number;
+function buildBoundsParams(bounds?: HeatmapBounds) {
+  if (!bounds) return {};
+  return {
+    north: bounds.north,
+    south: bounds.south,
+    east: bounds.east,
+    west: bounds.west,
+  };
 }
 
 export const heatmapApi = {
-  getApplications: (params: { months: string; north?: number; south?: number; east?: number; west?: number }) => {
-    const search = new URLSearchParams();
-    search.set('months', params.months);
-    if (params.north != null) search.set('north', String(params.north));
-    if (params.south != null) search.set('south', String(params.south));
-    if (params.east != null) search.set('east', String(params.east));
-    if (params.west != null) search.set('west', String(params.west));
-    return apiClient
-      .get<HeatmapDataPoint[]>(`/heatmap/applications?${search.toString()}`)
-      .then((r) => r.data);
+  getApplications: async (months = 12, bounds?: HeatmapBounds): Promise<HeatmapPoint[]> => {
+    const { data } = await apiClient.get<HeatmapPoint[]>('/heatmap/applications', {
+      params: { months, ...buildBoundsParams(bounds) },
+    });
+    return data;
   },
-  getCommencements: (params: { months: string; north?: number; south?: number; east?: number; west?: number }) => {
-    const search = new URLSearchParams();
-    search.set('months', params.months);
-    if (params.north != null) search.set('north', String(params.north));
-    if (params.south != null) search.set('south', String(params.south));
-    if (params.east != null) search.set('east', String(params.east));
-    if (params.west != null) search.set('west', String(params.west));
-    return apiClient
-      .get<HeatmapDataPoint[]>(`/heatmap/commencements?${search.toString()}`)
-      .then((r) => r.data);
+
+  getCommencements: async (months = 12, bounds?: HeatmapBounds): Promise<HeatmapPoint[]> => {
+    const { data } = await apiClient.get<HeatmapPoint[]>('/heatmap/commencements', {
+      params: { months, ...buildBoundsParams(bounds) },
+    });
+    return data;
   },
-  getSales: (params: { months: string; north?: number; south?: number; east?: number; west?: number }) => {
-    const search = new URLSearchParams();
-    search.set('months', params.months);
-    if (params.north != null) search.set('north', String(params.north));
-    if (params.south != null) search.set('south', String(params.south));
-    if (params.east != null) search.set('east', String(params.east));
-    if (params.west != null) search.set('west', String(params.west));
-    return apiClient
-      .get<HeatmapDataPoint[]>(`/heatmap/sales?${search.toString()}`)
-      .then((r) => r.data);
+
+  getSales: async (months = 12, bounds?: HeatmapBounds): Promise<HeatmapPoint[]> => {
+    const { data } = await apiClient.get<HeatmapPoint[]>('/heatmap/sales', {
+      params: { months, ...buildBoundsParams(bounds) },
+    });
+    return data;
   },
 };
