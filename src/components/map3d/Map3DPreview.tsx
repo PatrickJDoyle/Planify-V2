@@ -153,6 +153,11 @@ export function Map3DPreview({
       setIsLoading(false);
       return () => undefined;
     }
+    if (!mapboxgl.supported()) {
+      setError('Mapbox is not supported in this browser environment.');
+      setIsLoading(false);
+      return () => undefined;
+    }
 
     mapboxgl.accessToken = config.accessToken;
     const styleUrl =
@@ -244,12 +249,29 @@ export function Map3DPreview({
       });
 
       map.on('error', (event) => {
-        // Surface map/style/token errors instead of endless spinner
+        const rawMessage =
+          (event?.error as Error | undefined)?.message ??
+          'Mapbox failed to load.';
+        const message = rawMessage.toLowerCase();
+        const authOrStyleError =
+          message.includes('401') ||
+          message.includes('403') ||
+          message.includes('unauthorized') ||
+          message.includes('not authorized') ||
+          message.includes('access token') ||
+          message.includes('forbidden') ||
+          message.includes('style');
+
+        // Always surface actionable auth/style errors, even post-load.
+        if (authOrStyleError) {
+          setError('Mapbox style/token error. Check NEXT_PUBLIC_MAPBOX_TOKEN and allowed URLs.');
+          setIsLoading(false);
+          return;
+        }
+
+        // Fallback for unknown pre-load failures.
         if (!hasLoadedRef.current) {
-          const message =
-            (event?.error as Error | undefined)?.message ??
-            'Mapbox failed to load. Check token/domain restrictions.';
-          setError(message);
+          setError(rawMessage);
           setIsLoading(false);
         }
       });
