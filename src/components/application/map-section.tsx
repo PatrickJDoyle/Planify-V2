@@ -55,11 +55,27 @@ function zoneColor(code?: string) {
 export function MapSection({ application: app, zoning, nearbyZones = [] }: MapSectionProps) {
   const [showZones, setShowZones] = React.useState(true);
   const [mapMode, setMapMode] = React.useState<'google' | 'mapbox'>('google');
+  const [mapboxRenderKey, setMapboxRenderKey] = React.useState(0);
+  const [mapboxReady, setMapboxReady] = React.useState(false);
   const { isLoaded } = useJsApiLoader({
     id: GOOGLE_MAPS_LOADER_ID,
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
     libraries: GOOGLE_MAPS_LIBRARIES,
   });
+
+  React.useEffect(() => {
+    if (mapMode === 'mapbox') {
+      // Delay mount until tab layout has settled to avoid zero-size initialization.
+      setMapboxReady(false);
+      const timer = window.setTimeout(() => {
+        setMapboxRenderKey((k) => k + 1);
+        setMapboxReady(true);
+      }, 120);
+      return () => window.clearTimeout(timer);
+    }
+    setMapboxReady(false);
+    return undefined;
+  }, [mapMode]);
 
   const hasCoords = app.latitude && app.longitude;
   if (!hasCoords) {
@@ -189,14 +205,21 @@ export function MapSection({ application: app, zoning, nearbyZones = [] }: MapSe
             </TabsContent>
 
             <TabsContent value="mapbox" className="mt-0">
-              <div className="overflow-hidden rounded-md border border-border">
-                <Map3DPreview
-                  latitude={app.latitude}
-                  longitude={app.longitude}
-                  showZones={showZones}
-                  zoning={zoning ?? null}
-                  nearbyZones={nearbyZones}
-                />
+              <div className="overflow-hidden rounded-md border border-border bg-background-subtle">
+                {mapboxReady ? (
+                  <Map3DPreview
+                    key={`mapbox-${mapboxRenderKey}`}
+                    latitude={app.latitude}
+                    longitude={app.longitude}
+                    showZones={showZones}
+                    zoning={zoning ?? null}
+                    nearbyZones={nearbyZones}
+                  />
+                ) : (
+                  <div className="flex h-[450px] items-center justify-center text-sm text-foreground-muted">
+                    Initializing 3D map...
+                  </div>
+                )}
               </div>
             </TabsContent>
           </Tabs>

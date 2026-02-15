@@ -22,10 +22,16 @@ export const reportsApi = {
     longitude,
     radius,
   }: NearbyApplicationsParams): Promise<unknown[]> => {
-    const { data } = await apiClient.get<unknown[]>('/pre-planning/nearby-applications', {
+    const { data } = await apiClient.get<unknown>('/pre-planning/nearby-applications', {
       params: { latitude, longitude, radius },
     });
-    return data;
+    if (Array.isArray(data)) return data;
+    if (data && typeof data === 'object') {
+      const payload = data as { applications?: unknown[]; data?: unknown[] };
+      if (Array.isArray(payload.applications)) return payload.applications;
+      if (Array.isArray(payload.data)) return payload.data;
+    }
+    return [];
   },
 
   getOptimalRadius: async ({
@@ -35,7 +41,11 @@ export const reportsApi = {
     const { data } = await apiClient.get<OptimalRadiusResponse>('/pre-planning/optimal-radius', {
       params: { latitude, longitude },
     });
-    return data;
+    return {
+      initialCount: data?.initialCount ?? 0,
+      adjustedRadius: data?.adjustedRadius ?? 500,
+      applications: Array.isArray(data?.applications) ? data.applications : [],
+    };
   },
 
   computeStats: async (payload: PrePlanningGeneratePayload): Promise<PrePlanningStatsResponse> => {

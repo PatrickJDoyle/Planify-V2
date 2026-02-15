@@ -20,6 +20,8 @@ export default function PrePlanningReportsPage() {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [radius, setRadius] = useState(1000);
   const [reportText, setReportText] = useState('');
+  const [errorText, setErrorText] = useState('');
+  const [statusText, setStatusText] = useState('Select a location to begin.');
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
 
   const { isLoaded } = useJsApiLoader({
@@ -65,19 +67,39 @@ export default function PrePlanningReportsPage() {
     setCoords({ lat: location.lat(), lng: location.lng() });
     setAddress(place.formatted_address || place.name || '');
     setReportText('');
+    setErrorText('');
+    setStatusText('Location selected. Fetch nearby applications or optimal radius.');
   };
 
   const handleComputeStats = async () => {
-    const response = await statsMutation.mutateAsync(payload);
-    const appSummary = response.applications
-      ? JSON.stringify(response.applications, null, 2)
-      : 'No application summary returned.';
-    setReportText(`Pre-Planning Stats\n\n${appSummary}`);
+    try {
+      setErrorText('');
+      setStatusText('Computing structured statistics...');
+      const response = await statsMutation.mutateAsync(payload);
+      const appSummary = response.applications
+        ? JSON.stringify(response.applications, null, 2)
+        : 'No application summary returned.';
+      setReportText(`Pre-Planning Stats\n\n${appSummary}`);
+      setStatusText('Statistics generated successfully.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to compute stats.';
+      setErrorText(message);
+      setStatusText('Stats computation failed.');
+    }
   };
 
   const handleGenerateReport = async () => {
-    const response = await generateMutation.mutateAsync(payload);
-    setReportText(response.content || 'Report generated, but no content returned.');
+    try {
+      setErrorText('');
+      setStatusText('Generating report...');
+      const response = await generateMutation.mutateAsync(payload);
+      setReportText(response.content || 'Report generated, but no content returned.');
+      setStatusText('Report generated successfully.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to generate report.';
+      setErrorText(message);
+      setStatusText('Report generation failed.');
+    }
   };
 
   return (
@@ -165,6 +187,14 @@ export default function PrePlanningReportsPage() {
                 Generate Report
               </Button>
             </div>
+            {(nearbyQuery.error || optimalQuery.error || errorText) && (
+              <div className="rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-700">
+                {errorText ||
+                  (nearbyQuery.error instanceof Error && nearbyQuery.error.message) ||
+                  (optimalQuery.error instanceof Error && optimalQuery.error.message) ||
+                  'An unknown error occurred.'}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -176,6 +206,9 @@ export default function PrePlanningReportsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="mb-3 rounded-md border border-border bg-background-subtle p-2 text-xs text-foreground-muted">
+              {statusText}
+            </div>
             <div className="min-h-[520px] rounded-md border border-border bg-background-subtle p-4">
               {reportText ? (
                 <pre className="whitespace-pre-wrap text-sm text-foreground">{reportText}</pre>
