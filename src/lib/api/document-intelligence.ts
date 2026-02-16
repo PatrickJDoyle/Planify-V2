@@ -65,13 +65,13 @@ export interface DrawingsResponse {
   total: number;
 }
 
-function getAuthHeaders(): Record<string, string> {
+function getAuthHeaders(tokenOverride?: string): Record<string, string> {
   const headers: Record<string, string> = {
     Accept: 'text/event-stream',
   };
 
   if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('authToken');
+    const token = tokenOverride || localStorage.getItem('authToken');
     const userId = localStorage.getItem('userId');
     if (token) headers.Authorization = `Bearer ${token}`;
     if (userId) headers['x-user-id'] = userId;
@@ -87,12 +87,17 @@ function absoluteImageUrl(url: string): string {
 }
 
 export const documentIntelligenceApi = {
-  getStoredDrawings: async (applicationNumber: string, drawingType?: string): Promise<DrawingsResponse> => {
+  getStoredDrawings: async (
+    applicationNumber: string,
+    drawingType?: string,
+    token?: string,
+  ): Promise<DrawingsResponse> => {
     const { data } = await apiClient.get<DrawingsResponse>('/document-intelligence/drawings', {
       params: {
         applicationNumber,
         ...(drawingType ? { drawingType } : {}),
       },
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
 
     return {
@@ -111,6 +116,7 @@ export const documentIntelligenceApi = {
       priorityOnly?: boolean;
       includeDrawings?: boolean;
       skipCache?: boolean;
+      token?: string;
     },
     callbacks: {
       onProgress?: (progress: IntelligenceProgress) => void;
@@ -130,7 +136,7 @@ export const documentIntelligenceApi = {
 
     const response = await fetch(`${base}/document-intelligence/analyze?${query.toString()}`, {
       method: 'GET',
-      headers: getAuthHeaders(),
+      headers: getAuthHeaders(params.token),
       signal,
     });
 

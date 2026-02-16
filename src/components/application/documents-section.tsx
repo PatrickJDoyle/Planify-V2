@@ -3,6 +3,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
+  ChevronDown,
+  ChevronUp,
   CheckCircle2,
   ExternalLink,
   FileSearch,
@@ -15,6 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
+import { useAuth } from '@clerk/nextjs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,10 +48,12 @@ function absoluteMaybe(url: string): string {
 }
 
 export function DocumentsSection({ application: app }: DocumentsSectionProps) {
+  const { getToken } = useAuth();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [progress, setProgress] = useState<IntelligenceProgress | null>(null);
   const [analysis, setAnalysis] = useState<IntelligenceResult | null>(null);
   const [storedImages, setStoredImages] = useState<StoredDrawingImageRecord[]>([]);
+  const [expandedDocs, setExpandedDocs] = useState<Set<string>>(new Set());
   const [errorText, setErrorText] = useState('');
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -57,13 +62,18 @@ export function DocumentsSection({ application: app }: DocumentsSectionProps) {
     if (!app.applicationNumber) return;
 
     try {
-      const response = await documentIntelligenceApi.getStoredDrawings(app.applicationNumber);
+      const token = await getToken();
+      const response = await documentIntelligenceApi.getStoredDrawings(
+        app.applicationNumber,
+        undefined,
+        token || undefined,
+      );
       setStoredImages(response.images ?? []);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load stored drawing images.';
       setErrorText(message);
     }
-  }, [app.applicationNumber]);
+  }, [app.applicationNumber, getToken]);
 
   useEffect(() => {
     refreshStoredImages();
@@ -94,6 +104,7 @@ export function DocumentsSection({ application: app }: DocumentsSectionProps) {
           includeDrawings: true,
           priorityOnly: false,
           skipCache: false,
+          token: (await getToken()) || undefined,
         },
         {
           onProgress: (p) => setProgress(p),
@@ -145,12 +156,24 @@ export function DocumentsSection({ application: app }: DocumentsSectionProps) {
     const merged = [...storedImages, ...analysisImages];
     const seen = new Set<string>();
     return merged.filter((img) => {
-      const key = `${img.documentName}|${img.pageNumber}|${img.imageUrl}`;
+      const key = `${img.documentName}|${img.pageNumber}|${img.drawingType}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     });
   }, [analysis?.analyses, storedImages]);
+
+  const toggleDocExpanded = (fileName: string) => {
+    setExpandedDocs((prev) => {
+      const next = new Set(prev);
+      if (next.has(fileName)) {
+        next.delete(fileName);
+      } else {
+        next.add(fileName);
+      }
+      return next;
+    });
+  };
 
   const groupedImages = useMemo(() => {
     const groups = new Map<string, typeof allDisplayImages>();
@@ -241,6 +264,9 @@ export function DocumentsSection({ application: app }: DocumentsSectionProps) {
                 Analysis complete in {(analysis.processingTimeMs / 1000).toFixed(1)}s
               </p>
               <p className="mt-1 text-xs text-green-800">{analysis.overallSummary}</p>
+              <p className="mt-1 text-xs text-green-800">
+                Analyzed {analysis.documentsAnalyzed} of {analysis.documentsFound} documents
+              </p>
               {analysis.keyFindings?.length ? (
                 <div className="mt-2 flex flex-wrap gap-1">
                   {analysis.keyFindings.slice(0, 6).map((finding) => (
@@ -254,6 +280,26 @@ export function DocumentsSection({ application: app }: DocumentsSectionProps) {
           ) : null}
         </CardContent>
       </Card>
+
+      {analysis?.keyFindings?.length ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Structured Key Findings</CardTitle>
+            <CardDescription>Deterministic extraction from analyzed documents.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {analysis.keyFindings.map((finding) => (
+              <div
+                key={`${finding.category}-${finding.label}-${finding.source}`}
+                className="grid gap-2 rounded-md border border-border bg-background-subtle p-3 sm:grid-cols-[180px_1fr]"
+              >
+                <p className="text-xs font-medium uppercase tracking-wide text-foreground-muted">{finding.label}</p>
+                <p className="text-sm text-foreground">{finding.value}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Card>
@@ -361,6 +407,62 @@ export function DocumentsSection({ application: app }: DocumentsSectionProps) {
           )}
         </CardContent>
       </Card>
+
+      {analysis?.analyses?.length ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Document Analysis Register</CardTitle>
+            <CardDescription>Per-document summaries and extracted key facts.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {analysis.analyses.map((doc) => (
+              <div key={doc.fileName} className="overflow-hidden rounded-md border border-border bg-background-subtle">
+                <button
+                  type="button"
+                  onClick={() => toggleDocExpanded(doc.fileName)}
+                  className="flex w-full items-center justify-between p-3 text-left"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-foreground">{doc.fileName}</p>
+                    <p className="text-xs text-foreground-muted">
+                      {(doc.documentType || 'other').replace('_', ' ')} • Confidence {(doc.confidence * 100).toFixed(0)}%
+                    </p>
+                  </div>
+                  {expandedDocs.has(doc.fileName) ? (
+                    <ChevronUp className="h-4 w-4 text-foreground-muted" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-foreground-muted" />
+                  )}
+                </button>
+
+                {expandedDocs.has(doc.fileName) ? (
+                  <div className="border-t border-border bg-surface p-3">
+                    <p className="text-sm text-foreground">{doc.summary}</p>
+                    {doc.keyFacts?.length ? (
+                      <div className="mt-3 space-y-2">
+                        {doc.keyFacts.map((fact) => (
+                          <div
+                            key={`${doc.fileName}-${fact.label}-${fact.value}`}
+                            className="flex items-center justify-between rounded-md border border-border bg-background px-3 py-2 text-xs"
+                          >
+                            <span className="text-foreground-muted">{fact.label}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-foreground">{fact.value}</span>
+                              <Badge variant="outline" className="text-[10px] capitalize">
+                                {fact.importance}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {selectedImage ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-6">
