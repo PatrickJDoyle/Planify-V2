@@ -169,7 +169,7 @@ export const documentIntelligenceApi = {
         try {
           const data = JSON.parse(payload);
 
-          if (eventType === 'progress' || data?.progress != null || data?.stage) {
+          if (eventType === 'progress' || data?.progress != null || data?.stage === 'connecting' || data?.stage === 'retrieving' || data?.stage === 'downloading' || data?.stage === 'analyzing' || data?.stage === 'summarizing' || data?.stage === 'complete') {
             callbacks.onProgress?.(data as IntelligenceProgress);
           }
 
@@ -179,7 +179,7 @@ export const documentIntelligenceApi = {
             return;
           }
 
-          if (eventType === 'error' || data?.error || (data?.message && !data?.analyses)) {
+          if (eventType === 'error' || data?.error || data?.stage === 'error') {
             callbacks.onError(new Error(data?.message || data?.error || 'Unknown analysis error'));
             return;
           }
