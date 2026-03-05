@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useGetUser } from '@/lib/queries/user';
+import { useUserProfile } from '@/lib/queries/user';
 import { billingApi } from '@/lib/api/billing';
 import { TIER_LIMITS } from '@/lib/types/user';
 import type { SubscriptionTier } from '@/lib/types/user';
@@ -105,7 +105,7 @@ function CurrentPlanCard({ tier }: { tier: SubscriptionTier }) {
 
 export function BillingPageContent() {
   const router = useRouter();
-  const { data: user, isLoading } = useGetUser();
+  const { profile, isLoading, tier: rawTier } = useUserProfile();
 
   if (isLoading) {
     return (
@@ -116,7 +116,7 @@ export function BillingPageContent() {
     );
   }
 
-  const tier = (user?.subscriptionTier ?? 'free') as SubscriptionTier;
+  const tier = (rawTier ?? 'free') as SubscriptionTier;
 
   return (
     <div className="space-y-6">
@@ -165,8 +165,8 @@ export function BillingPageContent() {
                 <span className="text-sm text-foreground">Next billing date</span>
               </div>
               <span className="text-sm text-foreground-muted">
-                {user?.subscriptionStartDate
-                  ? new Date(user.subscriptionStartDate).toLocaleDateString('en-IE', {
+                {profile?.subscriptionStartDate
+                  ? new Date(profile.subscriptionStartDate).toLocaleDateString('en-IE', {
                       day: 'numeric',
                       month: 'long',
                       year: 'numeric',
