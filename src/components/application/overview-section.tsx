@@ -109,31 +109,49 @@ export function OverviewSection({ application: app, bcmsNotices }: OverviewSecti
           </CardContent>
         </Card>
 
-        {/* Street View */}
+        {/* Street View Polaroid Style */}
         {streetViewUrl && (
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-foreground">Location</h3>
-                <a
-                  href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${app.latitude},${app.longitude}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-xs text-primary hover:underline"
-                >
-                  <MapPin className="h-3 w-3" />
-                  Open Street View
-                </a>
-              </div>
-              <div className="mt-3 overflow-hidden rounded-md">
+          <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-b from-neutral-50 to-neutral-300 p-6 shadow-inner sm:p-10 dark:from-neutral-900 dark:to-neutral-950">
+            {/* Polaroid Frame */}
+            <div className="mx-auto max-w-3xl overflow-hidden rounded-sm bg-white p-3 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] ring-1 ring-black/10 transition-transform duration-500 hover:scale-[1.01] dark:bg-neutral-800">
+              {/* Image Container */}
+              <div className="group relative overflow-hidden rounded-sm bg-neutral-100 dark:bg-neutral-900">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={streetViewUrl}
                   alt="Street View"
-                  className="h-[280px] w-full object-cover"
+                  className="aspect-[16/9] w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                 />
+                
+                {/* Bottom Overlay Gradient */}
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-90 transition-opacity duration-300" />
+
+                {/* Bottom Content Area */}
+                <div className="absolute inset-x-0 bottom-0 flex flex-col justify-end p-5 md:flex-row md:items-end md:justify-between">
+                  {/* Left Side: Context & Address */}
+                  <div className="mb-4 min-w-0 pr-4 md:mb-0">
+                    <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.15em] text-white/80 drop-shadow-sm">
+                      Site Context
+                    </p>
+                    <h4 className="truncate text-lg font-medium tracking-tight text-white drop-shadow-sm sm:text-xl md:max-w-xs">
+                      {formatAddress(app.formattedAddress ?? app.developmentAddress, 45)}
+                    </h4>
+                  </div>
+                  
+                  {/* Right Side: Interactive Button */}
+                  <a
+                    href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${app.latitude},${app.longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex shrink-0 items-center justify-center gap-2 rounded-md border border-white/20 bg-white/10 px-4 py-2.5 text-xs font-semibold tracking-wide text-white shadow-sm backdrop-blur-md transition-all hover:bg-white/20 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-white/50"
+                  >
+                    <MapPin className="h-4 w-4" />
+                    Interactive View
+                  </a>
+                </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         )}
       </div>
 
