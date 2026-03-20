@@ -237,7 +237,7 @@ export function OverviewSection({ application: app, bcmsNotices }: OverviewSecti
                   <div className="h-full w-[75%] bg-destructive" />
                 </div>
                 <p className="mt-2 text-xs italic text-foreground-muted">
-                  "Primary concerns focus on local traffic congestion and right to light impacts on adjoining properties."
+                  &quot;Primary concerns focus on local traffic congestion and right to light impacts on adjoining properties.&quot;
                 </p>
               </div>
             </div>
