@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   MapPin,
   Building2,
@@ -25,6 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useCreateAlert } from '@/lib/queries/alerts';
+import { useUserProfile } from '@/lib/queries/user';
 import { PLANNING_AUTHORITIES } from '@/lib/utils/constants';
 import type { AlertScope, AlertType } from '@/lib/types/alerts';
 
@@ -39,6 +40,7 @@ interface WizardState {
   alertType: AlertType | null;
   scope: AlertScope | null;
   planningAuthority: string;
+  keywordIds: number[];
   address: string;
   radius: number;
   latitude: number | null;
@@ -137,11 +139,13 @@ function StepIndicator({ steps, current }: { steps: string[]; current: number })
 }
 
 export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
+  const { profile, tier } = useUserProfile();
   const [step, setStep] = useState<Step>('type');
   const [state, setState] = useState<WizardState>({
     alertType: null,
     scope: null,
     planningAuthority: '',
+    keywordIds: [],
     address: '',
     radius: 1000,
     latitude: null,
@@ -152,6 +156,12 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
   const [geocodeError, setGeocodeError] = useState('');
 
   const createAlert = useCreateAlert();
+  const keywords = useMemo(() => profile?.keywords ?? [], [profile?.keywords]);
+  const canUseAdvancedScopes = tier === 'enterprise';
+  const selectedKeywords = useMemo(
+    () => keywords.filter((keyword) => state.keywordIds.includes(keyword.id)),
+    [keywords, state.keywordIds],
+  );
 
   const STEPS: Step[] = ['type', 'scope', 'location', 'confirm'];
   const stepLabels = ['Type', 'Scope', 'Location', 'Confirm'];
@@ -164,12 +174,14 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
       alertType: null,
       scope: null,
       planningAuthority: '',
+      keywordIds: [],
       address: '',
       radius: 1000,
       latitude: null,
       longitude: null,
       resolvedAddress: null,
     });
+    createAlert.reset();
   };
 
   const handleClose = () => {
@@ -207,14 +219,29 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
     if (prevIdx >= 0) setStep(STEPS[prevIdx]!);
   };
 
+  const toggleKeyword = (keywordId: number) => {
+    setState((current) => {
+      const selected = current.keywordIds.includes(keywordId)
+        ? current.keywordIds.filter((id) => id !== keywordId)
+        : [...current.keywordIds, keywordId];
+      return { ...current, keywordIds: selected };
+    });
+  };
+
   const canProceed = () => {
     if (geocoding) return false;
     if (step === 'type') return !!state.alertType;
     if (step === 'scope') return !!state.scope;
     if (step === 'location') {
-      if (state.scope === 'authority') return !!state.planningAuthority;
+      if (state.scope === 'authority') {
+        if (!canUseAdvancedScopes || keywords.length === 0) return false;
+        return !!state.planningAuthority && state.keywordIds.length > 0;
+      }
       if (state.scope === 'radius') return !!state.address.trim() && state.radius > 0;
-      if (state.scope === 'nationwide') return true;
+      if (state.scope === 'nationwide') {
+        if (!canUseAdvancedScopes || keywords.length === 0) return false;
+        return state.keywordIds.length > 0;
+      }
     }
     return true;
   };
@@ -225,6 +252,10 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
         alertType: state.alertType!,
         scope: state.scope!,
         planningAuthority: state.planningAuthority || undefined,
+        keywordIds:
+          state.scope === 'authority' || state.scope === 'nationwide'
+            ? state.keywordIds
+            : undefined,
         address: state.address || undefined,
         radius: state.scope === 'radius' ? state.radius : undefined,
         latitude: state.latitude ?? undefined,
@@ -303,46 +334,64 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
         {/* Step: Scope */}
         {step === 'scope' && (
           <div className="space-y-2 py-1">
-            {SCOPES.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => setState((prev) => ({ ...prev, scope: s.id }))}
-                className={cn(
-                  'flex w-full items-start gap-3 rounded-lg border p-4 text-left transition-colors',
-                  state.scope === s.id
-                    ? 'border-brand-500 bg-brand-500/5'
-                    : 'border-border hover:border-brand-500/40 hover:bg-background-subtle',
-                )}
-              >
-                <div
+            {SCOPES.map((s) => {
+              const isLockedScope =
+                (s.id === 'authority' || s.id === 'nationwide') &&
+                !canUseAdvancedScopes;
+
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => {
+                    if (isLockedScope) return;
+                    setState((prev) => ({
+                      ...prev,
+                      scope: s.id,
+                      keywordIds: s.id === 'radius' ? [] : prev.keywordIds,
+                    }));
+                  }}
+                  disabled={isLockedScope}
                   className={cn(
-                    'flex h-8 w-8 shrink-0 items-center justify-center rounded-md',
-                    state.scope === s.id ? 'bg-brand-500/15' : 'bg-background-muted',
+                    'flex w-full items-start gap-3 rounded-lg border p-4 text-left transition-colors',
+                    state.scope === s.id
+                      ? 'border-brand-500 bg-brand-500/5'
+                      : 'border-border hover:border-brand-500/40 hover:bg-background-subtle',
+                    isLockedScope && 'cursor-not-allowed opacity-50 hover:border-border hover:bg-transparent',
                   )}
                 >
-                  <s.icon
+                  <div
                     className={cn(
-                      'h-4 w-4',
-                      state.scope === s.id ? 'text-brand-500' : 'text-foreground-muted',
+                      'flex h-8 w-8 shrink-0 items-center justify-center rounded-md',
+                      state.scope === s.id ? 'bg-brand-500/15' : 'bg-background-muted',
                     )}
-                  />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-foreground">{s.label}</p>
-                    {s.enterprise && (
-                      <Badge className="bg-brand-500/10 text-[10px] text-brand-500">Enterprise</Badge>
-                    )}
+                  >
+                    <s.icon
+                      className={cn(
+                        'h-4 w-4',
+                        state.scope === s.id ? 'text-brand-500' : 'text-foreground-muted',
+                      )}
+                    />
                   </div>
-                  <p className="mt-0.5 text-xs text-foreground-muted">{s.description}</p>
-                </div>
-                {state.scope === s.id && (
-                  <div className="ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-500">
-                    <Check className="h-3 w-3 text-white" />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-foreground">{s.label}</p>
+                      {s.enterprise && (
+                        <Badge className="bg-brand-500/10 text-[10px] text-brand-500">Enterprise</Badge>
+                      )}
+                      {isLockedScope && (
+                        <Badge variant="outline" className="text-[10px]">Locked</Badge>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-xs text-foreground-muted">{s.description}</p>
                   </div>
-                )}
-              </button>
-            ))}
+                  {state.scope === s.id && (
+                    <div className="ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-500">
+                      <Check className="h-3 w-3 text-white" />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
           </div>
         )}
 
@@ -350,23 +399,32 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
         {step === 'location' && (
           <div className="space-y-4 py-1">
             {state.scope === 'authority' && (
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground-muted">
-                  Planning Authority
-                </label>
-                <select
-                  value={state.planningAuthority}
-                  onChange={(e) => setState((s) => ({ ...s, planningAuthority: e.target.value }))}
-                  className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                >
-                  <option value="">Select an authority…</option>
-                  {PLANNING_AUTHORITIES.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground-muted">
+                    Planning Authority
+                  </label>
+                  <select
+                    value={state.planningAuthority}
+                    onChange={(e) => setState((s) => ({ ...s, planningAuthority: e.target.value }))}
+                    className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                    disabled={!canUseAdvancedScopes}
+                  >
+                    <option value="">Select an authority…</option>
+                    {PLANNING_AUTHORITIES.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <KeywordSelector
+                  keywords={keywords}
+                  selectedKeywordIds={state.keywordIds}
+                  onToggle={toggleKeyword}
+                  blockedByTier={!canUseAdvancedScopes}
+                />
+              </>
             )}
 
             {state.scope === 'radius' && (
@@ -426,13 +484,21 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
             )}
 
             {state.scope === 'nationwide' && (
-              <div className="rounded-lg border border-border bg-background-subtle p-4">
-                <p className="text-sm text-foreground">
-                  This alert will monitor all planning applications submitted across Ireland.
-                </p>
-                <p className="mt-1.5 text-xs text-foreground-muted">
-                  This is an Enterprise-tier feature with unlimited nationwide tracking.
-                </p>
+              <div className="space-y-4">
+                <div className="rounded-lg border border-border bg-background-subtle p-4">
+                  <p className="text-sm text-foreground">
+                    This alert will monitor all planning applications submitted across Ireland.
+                  </p>
+                  <p className="mt-1.5 text-xs text-foreground-muted">
+                    Nationwide alerts require at least one keyword to keep signal quality high.
+                  </p>
+                </div>
+                <KeywordSelector
+                  keywords={keywords}
+                  selectedKeywordIds={state.keywordIds}
+                  onToggle={toggleKeyword}
+                  blockedByTier={!canUseAdvancedScopes}
+                />
               </div>
             )}
           </div>
@@ -456,6 +522,16 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
                   }
                 />
               )}
+              {(state.scope === 'authority' || state.scope === 'nationwide') && (
+                <SummaryRow
+                  label="Keywords"
+                  value={
+                    selectedKeywords.length
+                      ? selectedKeywords.map((keyword) => keyword.keyword).join(', ')
+                      : 'None selected'
+                  }
+                />
+              )}
               {state.scope === 'radius' && (
                 <>
                   <SummaryRow label="Address" value={state.resolvedAddress ?? state.address} />
@@ -470,6 +546,11 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
         )}
 
         {/* Footer */}
+        {createAlert.error && (
+          <div className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            {(createAlert.error as Error).message || 'Failed to create alert.'}
+          </div>
+        )}
         <div className="flex items-center justify-between pt-2">
           <Button
             variant="ghost"
@@ -541,6 +622,62 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between px-4 py-3">
       <span className="text-xs text-foreground-muted">{label}</span>
       <span className="text-sm font-medium text-foreground">{value}</span>
+    </div>
+  );
+}
+
+function KeywordSelector({
+  keywords,
+  selectedKeywordIds,
+  onToggle,
+  blockedByTier,
+}: {
+  keywords: Array<{ id: number; keyword: string }>;
+  selectedKeywordIds: number[];
+  onToggle: (keywordId: number) => void;
+  blockedByTier: boolean;
+}) {
+  if (blockedByTier) {
+    return (
+      <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700">
+        Authority and nationwide alerts are available on the Enterprise plan.
+      </div>
+    );
+  }
+
+  if (keywords.length === 0) {
+    return (
+      <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700">
+        Add at least one keyword in your profile settings to create this alert scope.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <label className="text-xs font-medium text-foreground-muted">
+        Keywords (select one or more)
+      </label>
+      <div className="flex flex-wrap gap-2">
+        {keywords.map((keyword) => {
+          const selected = selectedKeywordIds.includes(keyword.id);
+          return (
+            <button
+              key={keyword.id}
+              type="button"
+              onClick={() => onToggle(keyword.id)}
+              className={cn(
+                'rounded-full border px-2.5 py-1 text-xs transition-colors',
+                selected
+                  ? 'border-brand-500 bg-brand-500/10 text-brand-500'
+                  : 'border-border text-foreground-muted hover:border-brand-500/40',
+              )}
+            >
+              {keyword.keyword}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

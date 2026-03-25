@@ -17,6 +17,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ExternalLink,
+  Lock,
+  RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -34,6 +36,7 @@ import {
   useMarkAllRead,
   useBulkUpdateAlerts,
 } from '@/lib/queries/alerts';
+import { useUserProfile } from '@/lib/queries/user';
 import type { InboxFilters, AlertScope, InboxAlert } from '@/lib/types/alerts';
 import { cn } from '@/lib/utils';
 
@@ -179,22 +182,46 @@ function InboxItem({
 }
 
 export default function InboxPage() {
+  const router = useRouter();
+  const { tier, isLoading: profileLoading } = useUserProfile();
+  const canAccessAlerts = tier !== 'free';
   const [filters, setFilters] = useState<InboxFilters>({ page: 1, pageSize: 20 });
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'starred' | 'archived'>('all');
 
-  const { data, isLoading } = useInbox({
-    ...filters,
-    read: activeTab === 'unread' ? false : undefined,
-    starred: activeTab === 'starred' ? true : undefined,
-    archived: activeTab === 'archived' ? true : undefined,
-  });
-  const { data: stats } = useInboxStats();
+  const {
+    data,
+    isLoading,
+    error: inboxError,
+    refetch: refetchInbox,
+    isFetching: isRefetchingInbox,
+  } = useInbox(
+    {
+      ...filters,
+      read: activeTab === 'unread' ? false : undefined,
+      starred: activeTab === 'starred' ? true : undefined,
+      archived: activeTab === 'archived' ? true : undefined,
+    },
+    { enabled: canAccessAlerts },
+  );
+  const {
+    data: stats,
+    error: statsError,
+    refetch: refetchStats,
+    isFetching: isRefetchingStats,
+  } = useInboxStats({ enabled: canAccessAlerts });
   const markRead = useMarkRead();
   const star = useStarAlert();
   const archive = useArchiveAlert();
   const markAllRead = useMarkAllRead();
   const bulkUpdate = useBulkUpdateAlerts();
+  const mutationError =
+    markRead.error ??
+    star.error ??
+    archive.error ??
+    markAllRead.error ??
+    bulkUpdate.error;
+  const hasQueryError = Boolean(inboxError || statsError);
 
   const items = data?.alerts ?? [];
   const totalPages = data?.totalPages ?? 1;
@@ -228,6 +255,51 @@ export default function InboxPage() {
     { id: 'archived' as const, label: 'Archived', count: stats?.archived },
   ];
 
+  if (profileLoading) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-4 p-6">
+        <Skeleton className="h-10 w-56 rounded-md" />
+        <Skeleton className="h-24 w-full rounded-xl" />
+        <Skeleton className="h-64 w-full rounded-xl" />
+      </div>
+    );
+  }
+
+  if (!canAccessAlerts) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-6 p-6">
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">Inbox</h1>
+          <p className="mt-0.5 text-sm text-foreground-muted">
+            New applications matching your alerts
+          </p>
+        </div>
+        <Card className="border-brand-500/30 bg-brand-500/5">
+          <CardContent className="space-y-3 p-5">
+            <div className="flex items-start gap-3">
+              <div className="rounded-lg bg-brand-500/15 p-2">
+                <Lock className="h-4 w-4 text-brand-500" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">Inbox is available on paid plans</p>
+                <p className="mt-1 text-xs text-foreground-muted">
+                  Upgrade to Personal or Enterprise to access alert inbox workflows.
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              className="bg-brand-500 hover:bg-brand-600"
+              onClick={() => router.push('/billing/plans')}
+            >
+              View plans
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-6">
       {/* Header */}
@@ -248,8 +320,44 @@ export default function InboxPage() {
         </Button>
       </div>
 
+      {hasQueryError && (
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardContent className="flex items-center justify-between gap-3 p-4">
+            <p className="text-sm text-destructive">
+              {(inboxError as Error)?.message ||
+                (statsError as Error)?.message ||
+                'Failed to load inbox.'}
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => {
+                void refetchInbox();
+                void refetchStats();
+              }}
+              disabled={isRefetchingInbox || isRefetchingStats}
+            >
+              <RefreshCw
+                className={cn(
+                  'h-3.5 w-3.5',
+                  (isRefetchingInbox || isRefetchingStats) && 'animate-spin',
+                )}
+              />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {mutationError && !hasQueryError && (
+        <div className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          {(mutationError as Error).message || 'Failed to update inbox item.'}
+        </div>
+      )}
+
       {/* Stat pills */}
-      {stats?.byScope && (
+      {!hasQueryError && stats?.byScope && (
         <div className="flex flex-wrap gap-2">
           {Object.entries(stats.byScope).map(([scope, count]) => {
             if (!count) return null;
@@ -270,6 +378,7 @@ export default function InboxPage() {
       )}
 
       {/* Tabs */}
+      {!hasQueryError && (
       <div className="flex items-center gap-0.5 rounded-lg border border-border bg-background-subtle p-1">
         {TABS.map((tab) => (
           <button
@@ -300,9 +409,10 @@ export default function InboxPage() {
           </button>
         ))}
       </div>
+      )}
 
       {/* Bulk toolbar */}
-      {selected.size > 0 && (
+      {!hasQueryError && selected.size > 0 && (
         <div className="flex items-center gap-2 rounded-lg border border-brand-500/30 bg-brand-500/5 px-4 py-2.5">
           <span className="text-xs font-medium text-foreground-muted">
             {selected.size} selected
@@ -322,6 +432,7 @@ export default function InboxPage() {
       )}
 
       {/* Content */}
+      {!hasQueryError && (
       <Card className="overflow-hidden p-0">
         {/* Select all bar */}
         <div className="flex items-center gap-3 border-b border-border px-5 py-2.5">
@@ -383,9 +494,10 @@ export default function InboxPage() {
           </div>
         )}
       </Card>
+      )}
 
       {/* Pagination */}
-      {totalPages > 1 && (
+      {!hasQueryError && totalPages > 1 && (
         <div className="flex items-center justify-between">
           <span className="text-xs text-foreground-muted">
             Page {page} of {totalPages}

@@ -12,6 +12,8 @@ import {
   MoreHorizontal,
   AlertCircle,
   Inbox,
+  Lock,
+  RefreshCw,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -152,9 +154,16 @@ function UsageBar({ used, max, label }: { used: number; max: number | null; labe
 
 export default function AlertsPage() {
   const router = useRouter();
-  const { data: alerts, isLoading } = useAlerts();
+  const { limits, isPaid, tier, isLoading: profileLoading } = useUserProfile();
+  const canAccessAlerts = tier !== 'free';
+  const {
+    data: alerts,
+    isLoading,
+    error: alertsError,
+    refetch: refetchAlerts,
+    isFetching: isRefetchingAlerts,
+  } = useAlerts(undefined, { enabled: canAccessAlerts });
   const deleteAlert = useDeleteAlert();
-  const { limits, isPaid, tier } = useUserProfile();
   const [wizardOpen, setWizardOpen] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
 
@@ -163,6 +172,10 @@ export default function AlertsPage() {
   const atLimit = maxAlerts !== null && alertCount >= maxAlerts;
 
   const handleNewAlert = () => {
+    if (!canAccessAlerts) {
+      setPaywallOpen(true);
+      return;
+    }
     if (!isPaid) {
       setPaywallOpen(true);
       return;
@@ -190,7 +203,13 @@ export default function AlertsPage() {
               variant="outline"
               size="sm"
               className="gap-1.5"
-              onClick={() => router.push('/alerts/inbox')}
+              onClick={() => {
+                if (!canAccessAlerts) {
+                  setPaywallOpen(true);
+                  return;
+                }
+                router.push('/alerts/inbox');
+              }}
             >
               <Inbox className="h-3.5 w-3.5" />
               Inbox
@@ -207,7 +226,32 @@ export default function AlertsPage() {
         </div>
 
         {/* Usage card */}
-        {!isLoading && (
+        {!profileLoading && !canAccessAlerts && (
+          <Card className="border-brand-500/30 bg-brand-500/5">
+            <CardContent className="space-y-3 p-5">
+              <div className="flex items-start gap-3">
+                <div className="rounded-lg bg-brand-500/15 p-2">
+                  <Lock className="h-4 w-4 text-brand-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Alerts are available on paid plans</p>
+                  <p className="mt-1 text-xs text-foreground-muted">
+                    Upgrade to Personal or Enterprise to create and manage alerts and inbox updates.
+                  </p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                className="bg-brand-500 hover:bg-brand-600"
+                onClick={() => router.push('/billing/plans')}
+              >
+                View plans
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {canAccessAlerts && !isLoading && (
           <Card>
             <CardContent className="p-5">
               <UsageBar
@@ -232,7 +276,7 @@ export default function AlertsPage() {
         )}
 
         {/* Loading */}
-        {isLoading && (
+        {canAccessAlerts && isLoading && (
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, i) => (
               <Skeleton key={i} className="h-24 w-full rounded-xl" />
@@ -240,8 +284,28 @@ export default function AlertsPage() {
           </div>
         )}
 
+        {canAccessAlerts && alertsError && !isLoading && (
+          <Card className="border-destructive/30 bg-destructive/5">
+            <CardContent className="flex items-center justify-between gap-3 p-4">
+              <p className="text-sm text-destructive">
+                {(alertsError as Error).message || 'Failed to load alerts.'}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => void refetchAlerts()}
+                disabled={isRefetchingAlerts}
+              >
+                <RefreshCw className={cn('h-3.5 w-3.5', isRefetchingAlerts && 'animate-spin')} />
+                Retry
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Empty */}
-        {!isLoading && alertCount === 0 && (
+        {canAccessAlerts && !isLoading && !alertsError && alertCount === 0 && (
           <EmptyState
             icon={Bell}
             title="No alerts configured"
@@ -259,7 +323,12 @@ export default function AlertsPage() {
         )}
 
         {/* Alert list */}
-        {!isLoading && alertCount > 0 && (
+        {canAccessAlerts && deleteAlert.error && (
+          <div className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            {(deleteAlert.error as Error).message || 'Failed to delete alert.'}
+          </div>
+        )}
+        {canAccessAlerts && !isLoading && !alertsError && alertCount > 0 && (
           <div className="space-y-3">
             {alerts!.map((alert) => (
               <AlertCard
@@ -278,7 +347,9 @@ export default function AlertsPage() {
         onOpenChange={setPaywallOpen}
         feature="Alerts"
         description={
-          atLimit
+          !canAccessAlerts
+            ? 'Alerts and inbox workflows are available on Personal and Enterprise plans.'
+            : atLimit
             ? `You're on the ${tier} plan which allows up to ${maxAlerts} alerts. Upgrade to create unlimited alerts.`
             : undefined
         }

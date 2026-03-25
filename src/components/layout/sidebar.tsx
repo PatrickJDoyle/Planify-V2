@@ -29,6 +29,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useUIStore } from '@/lib/stores/ui-store';
 import { useUnreadCount } from '@/lib/queries/alerts';
+import { useUserProfile } from '@/lib/queries/user';
 
 interface NavItem {
   label: string;
@@ -56,7 +57,9 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user } = useUser();
   const { sidebarCollapsed, toggleSidebar } = useUIStore();
-  const { data: unreadCount } = useUnreadCount();
+  const { tier } = useUserProfile();
+  const canAccessAlerts = tier !== 'free';
+  const { data: unreadCount } = useUnreadCount({ enabled: canAccessAlerts });
 
   const mainNav: NavItem[] = baseMainNav.map((item) => ({
     ...item,

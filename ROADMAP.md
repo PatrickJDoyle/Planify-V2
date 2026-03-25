@@ -41,7 +41,7 @@
 ---
 
 ### 1.2 Alerts — Full CRUD + Inbox
-> **Status**: ✅ DONE
+> **Status**: ✅ DONE (Rebaselined after keyword + tier alignment)
 
 | Task | Status |
 |------|--------|
@@ -56,6 +56,10 @@
 | Inbox: StatusBadge bug fixed (was rendering nothing) | ✅ Done |
 | Cache invalidation: archive/bulk now updates unread badge | ✅ Done |
 | Sidebar unread badge: polls every 30s via useUnreadCount | ✅ Done |
+| AlertWizard: authority/nationwide keyword selection from existing profile keywords | ✅ Done |
+| AlertWizard: send `keywordIds` for authority/nationwide payloads | ✅ Done |
+| Alert pages/inbox enforce PERSONAL+ access (FREE gets upgrade path) | ✅ Done |
+| User-facing query/mutation error states on alerts and inbox | ✅ Done |
 
 ---
 
