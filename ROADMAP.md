@@ -64,14 +64,15 @@
 ---
 
 ### 1.3 Billing / Stripe
-> **Status**: ⬜ TODO
+> **Status**: ✅ DONE
 
 | Task | Status |
 |------|--------|
-| Billing page shows current plan + usage summary | ⬜ Todo |
-| "Manage Billing" → redirect to Stripe portal | ⬜ Todo |
-| Pricing plans page CTAs trigger entrypoint for unpaid users | ⬜ Todo |
-| Paywall modal blocks gated features with upgrade CTA | ⬜ Todo |
+| Billing page shows current plan + usage summary | ✅ Done |
+| "Manage Billing" → redirect to Stripe portal | ✅ Done |
+| Pricing plans page CTAs trigger entrypoint for unpaid users | ✅ Done |
+| Paywall modal blocks gated features with upgrade CTA | ✅ Done |
+| Billing/plan entrypoint failures surface actionable UI errors | ✅ Done |
 
 ---
 
@@ -79,17 +80,18 @@
 > **Goal**: Transform Planify from a search tool into a professional workspace.
 > An architect creates a Project around a site. Everything flows from it.
 > This is what EirePlan calls a "Planning Hub" — we build it better with real data.
+> **Status**: 🚧 IN PROGRESS
 
 | Task | Status |
 |------|--------|
-| `/projects` — project list page (create, list, delete) | ⬜ Todo |
-| `/projects/[id]` — project workspace shell with tabs | ⬜ Todo |
-| Site Intelligence tab: zoning, nearby apps, commencements, sales | ⬜ Todo |
-| Monitored Applications tab: pinned applications for this project | ⬜ Todo |
-| Alerts tab: radius alert scoped to project site | ⬜ Todo |
-| Notes tab: client-side notes per project | ⬜ Todo |
-| "Add to Project" button on Application Detail page | ⬜ Todo |
-| Project persistence strategy (user_locations + favourites API) | ⬜ Todo |
+| `/projects` — project list page (create, list, delete) | ✅ Done |
+| `/projects/[id]` — project workspace shell with tabs | ✅ Done |
+| Site Intelligence tab: zoning, nearby apps, commencements, sales | 🚧 In progress |
+| Monitored Applications tab: pinned applications for this project | ✅ Done |
+| Alerts tab: radius alert scoped to project site | 🚧 In progress |
+| Notes tab: client-side notes per project | ✅ Done |
+| "Add to Project" button on Application Detail page | ✅ Done |
+| Project persistence strategy (user_locations + favourites API) | 🚧 In progress |
 
 ---
 

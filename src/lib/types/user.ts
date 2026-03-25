@@ -30,6 +30,8 @@ export interface UserProfile {
   userType: UserType | null;
   onboardingComplete: boolean;
   subscriptionTier: SubscriptionTier;
+  // Backend billing flag: true when an active paid subscription exists.
+  // Note: Personal tier is treated as free-but-enabled in product logic.
   isPaid: boolean;
   industry: string | null;
   subIndustry: string | null;
@@ -57,6 +59,7 @@ export interface TierLimits {
 
 export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
   free: {
+    // Base free tier (minimal/unonboarded)
     maxAlerts: null,
     maxFavourites: null,
     maxAlertRadius: null,
@@ -68,9 +71,10 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     canUseKeywords: false,
   },
   personal: {
+    // Personal tier (free plan for standard users)
     maxAlerts: 10,
     maxFavourites: 50,
-    maxAlertRadius: 2,
+    maxAlertRadius: 2, // km
     maxKeywords: null,
     maxLocations: 2,
     hasNationwideAccess: false,
@@ -79,10 +83,11 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     canUseKeywords: false,
   },
   enterprise: {
+    // Enterprise tier (paid professional plan)
     maxAlerts: null,
     maxFavourites: null,
     maxAlertRadius: null,
-    maxKeywords: 5,
+    maxKeywords: 30,
     maxLocations: 3,
     hasNationwideAccess: true,
     canExport: true,

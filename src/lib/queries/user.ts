@@ -18,12 +18,18 @@ export function useUserProfile() {
   const limits: TierLimits = profile
     ? TIER_LIMITS[profile.subscriptionTier] ?? TIER_LIMITS.free
     : TIER_LIMITS.free;
+  const isPersonalTier = profile?.subscriptionTier === 'personal';
+  const hasAccess =
+    isPersonalTier || Boolean(profile?.isPaid) || Boolean(profile?.bypassPaywall);
 
   return {
     ...query,
     profile,
     limits,
-    isPaid: profile?.isPaid ?? false,
+    // V1 compatibility semantics:
+    // - Personal tier is free but has standard access.
+    // - Enterprise tier needs active payment OR bypass.
+    isPaid: hasAccess,
     tier: profile?.subscriptionTier ?? 'free',
   };
 }

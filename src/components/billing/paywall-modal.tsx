@@ -39,7 +39,7 @@ export function PaywallModal({
 
   const handleUpgrade = () => {
     onOpenChange(false);
-    router.push('/billing');
+    router.push('/billing/plans');
   };
 
   return (

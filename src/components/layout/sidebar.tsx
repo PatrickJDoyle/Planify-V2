@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   Search,
   Star,
+  FolderOpen,
   Bell,
   Inbox,
   BarChart3,
@@ -40,7 +41,8 @@ interface NavItem {
 
 const baseMainNav: Omit<NavItem, 'badge'>[] = [
   { label: 'Search', href: '/dashboard', icon: Search },
-  { label: 'Saved Projects', href: '/saved', icon: Star },
+  { label: 'Projects', href: '/projects', icon: FolderOpen },
+  { label: 'Saved', href: '/saved', icon: Star },
   { label: 'Alerts', href: '/alerts', icon: Bell },
   { label: 'Inbox', href: '/alerts/inbox', icon: Inbox },
   { label: 'Reports', href: '/reports/pre-planning', icon: BarChart3 },

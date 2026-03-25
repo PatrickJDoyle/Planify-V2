@@ -6,6 +6,7 @@ import { ArrowLeft, X, Share2, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatusBadge, DecisionBadge, AppealBadge } from '@/components/shared/status-badge';
 import { FavoriteButton } from '@/components/shared/favorite-button';
+import { AddToProjectDialog } from '@/components/projects/add-to-project-dialog';
 import { formatAddress, formatDescription } from '@/lib/utils/formatting';
 import { formatDate } from '@/lib/utils/dates';
 import type { Application } from '@/lib/types/application';
@@ -48,6 +49,12 @@ export function ApplicationHeader({ application: app, zoning }: ApplicationHeade
           <div onClick={(e) => e.stopPropagation()}>
             <FavoriteButton applicationId={app.applicationId} />
           </div>
+          <AddToProjectDialog
+            applicationId={app.applicationId}
+            defaultAddress={app.formattedAddress ?? app.developmentAddress}
+            latitude={app.latitude}
+            longitude={app.longitude}
+          />
           <Button variant="outline" size="sm" className="gap-1.5" onClick={handleShare}>
             <Share2 className="h-3.5 w-3.5" />
             Share

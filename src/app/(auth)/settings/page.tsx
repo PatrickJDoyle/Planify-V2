@@ -23,7 +23,7 @@ import { useUserProfile } from '@/lib/queries/user';
 import { billingApi } from '@/lib/api/billing';
 import { cn } from '@/lib/utils';
 
-const TIER_LABELS = { free: 'Free', personal: 'Personal', enterprise: 'Enterprise' } as const;
+const TIER_LABELS = { free: 'Free', personal: 'Personal (Free)', enterprise: 'Enterprise' } as const;
 const TIER_COLORS = {
   free: 'bg-background-muted text-foreground-muted',
   personal: 'bg-blue-500/10 text-blue-600',
@@ -84,6 +84,7 @@ export default function SettingsPage() {
   const { user } = useUser();
   const { profile, tier } = useUserProfile();
   const [managingBilling, setManagingBilling] = useState(false);
+  const isPaidTier = tier === 'enterprise';
 
   // Notification preferences (local state only — extend to API when backend ready)
   const [notifNew, setNotifNew] = useState(true);
@@ -172,13 +173,13 @@ export default function SettingsPage() {
             value={
               <span className="flex items-center gap-2">
                 {TIER_LABELS[tier as keyof typeof TIER_LABELS] ?? 'Free'}
-                <Badge className={cn('text-[10px]', TIER_COLORS[tier as keyof typeof TIER_COLORS] ?? TIER_COLORS.free)}>
-                  {tier === 'free' ? 'Free forever' : 'Active'}
+                  <Badge className={cn('text-[10px]', TIER_COLORS[tier as keyof typeof TIER_COLORS] ?? TIER_COLORS.free)}>
+                  {isPaidTier ? 'Active' : 'Free plan'}
                 </Badge>
               </span>
             }
             action={
-              tier !== 'free' ? (
+              isPaidTier ? (
                 <Button
                   variant="ghost"
                   size="sm"

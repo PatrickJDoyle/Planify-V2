@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PricingCard } from '@/components/billing/pricing-card';
 import type { PricingTier } from '@/components/billing/pricing-card';
@@ -27,13 +27,13 @@ const TIERS: PricingTier[] = [
   },
   {
     id: 'personal',
-    name: 'Personal',
-    price: 29,
+    name: 'Personal (Free)',
+    price: 0,
     interval: 'month',
-    description: 'For homeowners and small developers tracking local activity.',
+    description: 'Free personal plan for homeowners and local monitoring.',
     badge: 'Most popular',
     highlighted: true,
-    cta: 'Upgrade to Personal',
+    cta: 'Current free plan',
     features: [
       'Everything in Free',
       'Up to 10 alerts (radius up to 2km)',
@@ -46,12 +46,10 @@ const TIERS: PricingTier[] = [
   {
     id: 'enterprise',
     name: 'Enterprise',
-    price: null,
-    priceLabel: 'Custom pricing',
-    interval: 'custom',
+    price: 35,
+    interval: 'month',
     description: 'For planning professionals, architects, and development firms.',
-    cta: 'Contact sales',
-    ctaVariant: 'outline',
+    cta: 'Upgrade to Enterprise',
     features: [
       'Everything in Personal',
       'Nationwide coverage',
@@ -61,7 +59,7 @@ const TIERS: PricingTier[] = [
       'Keywords-based alerting',
       'Organisation profiles',
       'Admin panel & team management',
-      'Priority support & SLA',
+      'Priority support',
     ],
   },
 ];
@@ -70,19 +68,18 @@ export default function PlansPage() {
   const router = useRouter();
   const { tier } = useUserProfile();
   const [loading, setLoading] = useState(false);
+  const [errorText, setErrorText] = useState('');
 
   const handleSelect = async (tierId: string) => {
-    if (tierId === 'free' || tierId === tier) return;
-
-    if (tierId === 'enterprise') {
-      window.open('mailto:sales@planify.ie?subject=Enterprise Plan Enquiry', '_blank');
-      return;
-    }
+    setErrorText('');
+    if (tierId === 'free' || tierId === 'personal' || tierId === tier) return;
 
     setLoading(true);
     try {
       const { url } = await billingApi.getEntrypoint(window.location.href);
       window.location.href = url;
+    } catch (error) {
+      setErrorText(error instanceof Error ? error.message : 'Unable to open checkout right now.');
     } finally {
       setLoading(false);
     }
@@ -118,9 +115,15 @@ export default function PlansPage() {
           />
         ))}
       </div>
+      {errorText && (
+        <div className="mx-auto flex w-full max-w-2xl items-center justify-center gap-2 rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <AlertCircle className="h-3.5 w-3.5" />}
+          {errorText}
+        </div>
+      )}
 
       <p className="text-center text-xs text-foreground-muted">
-        All prices exclude VAT. Cancel anytime. Enterprise plans include a custom contract and SLA.
+        All prices exclude VAT. Cancel anytime.
       </p>
     </div>
   );
