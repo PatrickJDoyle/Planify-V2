@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { GoogleMap, Polygon, useJsApiLoader } from '@react-google-maps/api';
+import { GoogleMap, Marker, Polygon, useJsApiLoader } from '@react-google-maps/api';
 import { ExternalLink, MapPin } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -65,7 +65,6 @@ export function MapSection({ application: app, zoning, nearbyZones = [] }: MapSe
 
   React.useEffect(() => {
     if (mapMode === 'mapbox') {
-      // Delay mount until tab layout has settled to avoid zero-size initialization.
       setMapboxReady(false);
       const timer = window.setTimeout(() => {
         setMapboxRenderKey((k) => k + 1);
@@ -105,14 +104,33 @@ export function MapSection({ application: app, zoning, nearbyZones = [] }: MapSe
 
   return (
     <div className="space-y-4">
+      {/* Zoning Info */}
       {zoning && (
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-foreground">Zoning Information</h3>
-              <span className="rounded-md bg-brand-50 px-2 py-0.5 text-xs font-semibold text-primary dark:bg-brand-900">
-                {zoning.zoneGzt}
-              </span>
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold text-foreground">Zoning</h3>
+                {(zoning.zoneDesc || zoning.gztDesc) && (
+                  <p className="mt-0.5 text-sm text-foreground-muted">
+                    {zoning.zoneDesc ?? zoning.gztDesc}
+                  </p>
+                )}
+                {zoning.planName && (
+                  <p className="mt-1 text-xs text-foreground-subtle">{zoning.planName}</p>
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <span
+                  className="rounded-md px-2.5 py-1 text-xs font-bold text-white"
+                  style={{ backgroundColor: zoneColor(zoning.zoneGzt) }}
+                >
+                  {zoning.zoneGzt}
+                </span>
+                {zoning.laName && (
+                  <span className="text-xs text-foreground-muted">{zoning.laName}</span>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -169,6 +187,13 @@ export function MapSection({ application: app, zoning, nearbyZones = [] }: MapSe
                       fullscreenControl: false,
                     }}
                   >
+                    {/* Application site pin */}
+                    <Marker
+                      position={center}
+                      title={app.applicationNumber}
+                    />
+
+                    {/* Main zoning polygon */}
                     {showZones && mainZonePath.length > 2 && (
                       <Polygon
                         paths={mainZonePath}
@@ -181,6 +206,8 @@ export function MapSection({ application: app, zoning, nearbyZones = [] }: MapSe
                         }}
                       />
                     )}
+
+                    {/* Nearby zone polygons */}
                     {showZones &&
                       nearbyZonePaths.map((zone) => (
                         <Polygon

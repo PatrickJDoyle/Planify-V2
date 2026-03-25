@@ -1,8 +1,10 @@
 'use client';
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { StatusBadge } from '@/components/shared/status-badge';
 import { formatDate } from '@/lib/utils/dates';
 import type { Application } from '@/lib/types/application';
 
@@ -12,6 +14,8 @@ interface RelatedSectionProps {
 }
 
 export function RelatedSection({ relatedApps, isLoading }: RelatedSectionProps) {
+  const router = useRouter();
+
   if (isLoading) return <RelatedSkeleton />;
 
   if (!relatedApps || relatedApps.length === 0) {
@@ -50,7 +54,7 @@ export function RelatedSection({ relatedApps, isLoading }: RelatedSectionProps) 
                 <tr
                   key={app.applicationId}
                   className="cursor-pointer transition-colors hover:bg-background-subtle"
-                  onClick={() => app.linkApplicationDetails && window.open(app.linkApplicationDetails, '_blank')}
+                  onClick={() => router.push(`/applications/${app.applicationId}`)}
                 >
                   <td className="py-2 pr-3 text-xs font-medium text-foreground">{app.applicationNumber}</td>
                   <td className="py-2 pr-3 text-xs text-foreground-muted">
@@ -58,7 +62,12 @@ export function RelatedSection({ relatedApps, isLoading }: RelatedSectionProps) 
                       ? `${app.developmentDescription.substring(0, 100)}...`
                       : '-'}
                   </td>
-                  <td className="py-2 pr-3 text-xs">{app.applicationStatus || '-'}</td>
+                  <td className="py-2 pr-3">
+                    <StatusBadge
+                      displayStatus={app.displayStatus ?? app.applicationStatus}
+                      statusCategory={app.statusCategory}
+                    />
+                  </td>
                   <td className="py-2 text-xs text-foreground-muted">{formatDate(app.receivedDate)}</td>
                 </tr>
               ))}

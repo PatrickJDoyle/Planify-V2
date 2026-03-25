@@ -4,7 +4,7 @@ import React from 'react';
 import {
   FileInput, FileQuestion, FileCheck, Gavel, Calendar,
   BadgeCheck, Timer, XCircle, Scale, Construction, Building2,
-  MapPin, ExternalLink, Brain, ShieldAlert, Sparkles, CheckCircle2
+  MapPin, ExternalLink, Home, Maximize2, LayoutGrid,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -59,17 +59,19 @@ export function OverviewSection({ application: app, bcmsNotices }: OverviewSecti
     ? `https://maps.googleapis.com/maps/api/streetview?size=640x360&location=${app.latitude},${app.longitude}&fov=80&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`
     : null;
 
+  const hasMetrics = (app.numResidentialUnits && app.numResidentialUnits > 0)
+    || (app.areaOfSite && app.areaOfSite > 0)
+    || (app.floorArea && app.floorArea > 0);
+
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-8">
       {/* LEFT COLUMN (Span 7) */}
       <div className="space-y-6 lg:col-span-7">
-        
+
         {/* Street View Polaroid Style */}
         {streetViewUrl && (
           <section className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-b from-neutral-50 to-neutral-300 p-6 shadow-inner sm:p-10 dark:from-neutral-900 dark:to-neutral-950">
-            {/* Polaroid Frame */}
             <div className="mx-auto max-w-3xl overflow-hidden rounded-sm bg-white p-3 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] ring-1 ring-black/10 transition-transform duration-500 hover:scale-[1.01] dark:bg-neutral-800">
-              {/* Image Container */}
               <div className="group relative overflow-hidden rounded-sm bg-neutral-100 dark:bg-neutral-900">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -77,13 +79,8 @@ export function OverviewSection({ application: app, bcmsNotices }: OverviewSecti
                   alt="Street View"
                   className="aspect-[16/9] w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
                 />
-                
-                {/* Bottom Overlay Gradient */}
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-90 transition-opacity duration-300" />
-
-                {/* Bottom Content Area */}
                 <div className="absolute inset-x-0 bottom-0 flex flex-col justify-end p-5 md:flex-row md:items-end md:justify-between">
-                  {/* Left Side: Context & Address */}
                   <div className="mb-4 min-w-0 pr-4 md:mb-0">
                     <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.15em] text-white/80 drop-shadow-sm">
                       Site Context
@@ -92,8 +89,6 @@ export function OverviewSection({ application: app, bcmsNotices }: OverviewSecti
                       {formatAddress(app.formattedAddress ?? app.developmentAddress, 45)}
                     </h4>
                   </div>
-                  
-                  {/* Right Side: Interactive Button */}
                   <a
                     href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${app.latitude},${app.longitude}`}
                     target="_blank"
@@ -109,7 +104,7 @@ export function OverviewSection({ application: app, bcmsNotices }: OverviewSecti
           </section>
         )}
 
-        {/* Interactive Timeline */}
+        {/* Application Timeline */}
         <section className="rounded-xl border border-border bg-background p-6 shadow-sm sm:p-8">
           <div className="mb-8 flex items-center justify-between">
             <h3 className="text-xl font-bold tracking-tight text-foreground">Application Timeline</h3>
@@ -119,16 +114,13 @@ export function OverviewSection({ application: app, bcmsNotices }: OverviewSecti
               </span>
             )}
           </div>
-          
+
           <div className="relative pl-2">
-            {/* Vertical Line */}
             <div className="absolute bottom-0 left-[23px] top-2 w-[2px] bg-border/60 dark:bg-border/40" />
-            
             <div className="space-y-8">
-              {timelineEvents.map((event, index) => {
+              {timelineEvents.map((event) => {
                 const Icon = event.icon;
                 const isPending = !app.decisionDate && (event.label === 'Decision Due' || event.label === 'Decision');
-                
                 return (
                   <div key={`${event.label}-${event.date}`} className={`relative flex items-start gap-6 ${isPending ? 'opacity-50' : ''}`}>
                     <div className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white shadow-lg ${isPending ? 'bg-background-muted text-foreground-muted shadow-none ring-1 ring-border' : 'bg-brand-500 shadow-brand-500/20'}`}>
@@ -146,7 +138,6 @@ export function OverviewSection({ application: app, bcmsNotices }: OverviewSecti
                   </div>
                 );
               })}
-              
               {timelineEvents.length === 0 && (
                 <p className="text-sm text-foreground-muted">No timeline events available.</p>
               )}
@@ -188,79 +179,48 @@ export function OverviewSection({ application: app, bcmsNotices }: OverviewSecti
 
       {/* RIGHT COLUMN (Span 5) */}
       <div className="space-y-6 lg:col-span-5">
-        
-        {/* AI OCR Summary Card */}
-        <section className="relative overflow-hidden rounded-xl bg-brand-600 p-6 text-white shadow-md sm:p-8 dark:bg-brand-700">
-          <div className="absolute -right-4 -top-4 p-8 opacity-10">
-            <Brain className="h-40 w-40" />
-          </div>
-          <h3 className="mb-4 flex items-center gap-2 text-xl font-bold tracking-tight">
-            <Sparkles className="h-5 w-5" />
-            AI Summary (OCR)
-          </h3>
-          <div className="relative z-10 space-y-5">
-            <p className="text-sm leading-relaxed text-white/90">
-              {formatDescription(app.formattedDescription ?? app.developmentDescription, 300) || 'Automated analysis pending for this application. Use the pre-planning report generator for deeper insights.'}
-            </p>
-            <div className="grid grid-cols-2 gap-4 border-t border-white/20 pt-5">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-white/70">Feasibility</p>
-                <p className="text-lg font-bold">82% (High)</p>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-white/70">Heritage Risk</p>
-                <p className="text-lg font-bold text-emerald-300">Low Impact</p>
-              </div>
-            </div>
-          </div>
+
+        {/* Development Description */}
+        <section className="rounded-xl border border-border bg-background p-6 shadow-sm sm:p-8">
+          <h3 className="mb-4 text-lg font-bold tracking-tight text-foreground">Development Description</h3>
+          <p className="text-sm leading-relaxed text-foreground-muted">
+            {app.formattedDescription ?? app.developmentDescription ?? 'No description available.'}
+          </p>
         </section>
 
-        {/* Sentiment Analysis */}
-        <section className="rounded-xl border-l-4 border-l-amber-500 bg-background p-6 shadow-sm sm:p-8">
-          <div className="mb-6 flex items-center justify-between">
-            <h3 className="text-lg font-bold tracking-tight text-foreground">Sentiment Analysis</h3>
-            <span className="rounded bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-              Moderate Conflict
-            </span>
-          </div>
-          <div className="space-y-6">
-            <div className="flex items-start gap-4">
-              <div className="shrink-0 rounded bg-destructive/10 p-2">
-                <ShieldAlert className="h-4 w-4 text-destructive" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="mb-2 flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-foreground">Public Objections</h4>
-                  <span className="text-xs font-semibold text-destructive">Critical (4)</span>
+        {/* Development Scale — only shown when real numeric data is available */}
+        {hasMetrics && (
+          <section className="rounded-xl border border-border bg-background p-6 shadow-sm sm:p-8">
+            <h3 className="mb-5 text-lg font-bold tracking-tight text-foreground">Development Scale</h3>
+            <div className="grid grid-cols-2 gap-3">
+              {app.numResidentialUnits !== undefined && app.numResidentialUnits > 0 && (
+                <div className="flex flex-col gap-1 rounded-lg bg-brand-50 p-4 dark:bg-brand-950">
+                  <Home className="h-4 w-4 text-brand-500" />
+                  <p className="mt-1 text-2xl font-bold text-brand-600 dark:text-brand-400">
+                    {app.numResidentialUnits}
+                  </p>
+                  <p className="text-xs font-medium text-foreground-muted">Residential Units</p>
                 </div>
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-background-muted">
-                  <div className="h-full w-[75%] bg-destructive" />
+              )}
+              {app.areaOfSite !== undefined && app.areaOfSite > 0 && (
+                <div className="flex flex-col gap-1 rounded-lg bg-background-subtle p-4">
+                  <Maximize2 className="h-4 w-4 text-foreground-subtle" />
+                  <p className="mt-1 text-2xl font-bold text-foreground">{app.areaOfSite}</p>
+                  <p className="text-xs font-medium text-foreground-muted">Hectares Site Area</p>
                 </div>
-                <p className="mt-2 text-xs italic text-foreground-muted">
-                  &quot;Primary concerns focus on local traffic congestion and right to light impacts on adjoining properties.&quot;
-                </p>
-              </div>
+              )}
+              {app.floorArea !== undefined && app.floorArea > 0 && (
+                <div className="flex flex-col gap-1 rounded-lg bg-background-subtle p-4">
+                  <LayoutGrid className="h-4 w-4 text-foreground-subtle" />
+                  <p className="mt-1 text-2xl font-bold text-foreground">
+                    {app.floorArea.toLocaleString()}
+                  </p>
+                  <p className="text-xs font-medium text-foreground-muted">Floor Area (sqm)</p>
+                </div>
+              )}
             </div>
-            
-            <div className="flex items-start gap-4">
-              <div className="shrink-0 rounded bg-emerald-500/10 p-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="mb-2 flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-foreground">Agency Support</h4>
-                  <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">Strong (8)</span>
-                </div>
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-background-muted">
-                  <div className="h-full w-[85%] bg-emerald-500" />
-                </div>
-                <p className="mt-2 text-xs text-foreground-muted">
-                  Transport and Environmental agencies offer conditional support with mitigating adjustments.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* Key Details Grid */}
         <section className="rounded-xl border border-border bg-background p-6 shadow-sm sm:p-8">
@@ -276,11 +236,11 @@ export function OverviewSection({ application: app, bcmsNotices }: OverviewSecti
             {app.appealDecision && app.appealDecision !== 'N/A' && (
               <DetailRow label="Appeal Decision" value={app.appealDecision} />
             )}
-            {app.numResidentialUnits !== undefined && app.numResidentialUnits > 0 && (
-              <DetailRow label="Res. Units" value={String(app.numResidentialUnits)} />
+            {app.landUseCode && (
+              <DetailRow label="Land Use" value={app.landUseCode} />
             )}
-            {app.areaOfSite !== undefined && app.areaOfSite > 0 && (
-              <DetailRow label="Site Area" value={`${app.areaOfSite} ha`} />
+            {app.oneOffHouse === 'Yes' && (
+              <DetailRow label="One-Off House" value="Yes" />
             )}
           </div>
         </section>
@@ -331,11 +291,7 @@ export function OverviewSkeleton() {
         <Card>
           <CardContent className="p-8">
             <Skeleton className="mb-4 h-6 w-40" />
-            <Skeleton className="h-20 w-full" />
-            <div className="mt-6 flex justify-between">
-              <Skeleton className="h-10 w-24" />
-              <Skeleton className="h-10 w-24" />
-            </div>
+            <Skeleton className="h-24 w-full" />
           </CardContent>
         </Card>
         <Card>

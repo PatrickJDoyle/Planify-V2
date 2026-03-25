@@ -72,7 +72,7 @@ export default function ApplicationDetailPage() {
               <TabsTrigger value="timeline">Timeline</TabsTrigger>
               <TabsTrigger value="property">Property History</TabsTrigger>
               <TabsTrigger value="bcms">BCMS</TabsTrigger>
-              <TabsTrigger value="prices">Prices</TabsTrigger>
+              <TabsTrigger value="prices">Nearby Sales</TabsTrigger>
               <TabsTrigger value="related">Related</TabsTrigger>
             </TabsList>
 
