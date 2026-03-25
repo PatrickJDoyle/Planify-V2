@@ -108,7 +108,7 @@ function InboxItem({
           </span>
           <div className="flex shrink-0 items-center gap-2">
             {item.ApplicationStatus && (
-              <StatusBadge status={item.ApplicationStatus} />
+              <StatusBadge displayStatus={item.ApplicationStatus} />
             )}
             <span className="text-[11px] text-foreground-subtle">
               {new Date(item.sentAt).toLocaleDateString('en-IE', {

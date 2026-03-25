@@ -10,6 +10,8 @@ import {
   ChevronLeft,
   Check,
   X,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import {
   Dialog,
@@ -41,6 +43,7 @@ interface WizardState {
   radius: number;
   latitude: number | null;
   longitude: number | null;
+  resolvedAddress: string | null;
 }
 
 const ALERT_TYPES: { id: AlertType; label: string; description: string; icon: React.ElementType }[] = [
@@ -81,6 +84,25 @@ const SCOPES: { id: AlertScope; label: string; description: string; icon: React.
 ];
 
 const RADIUS_OPTIONS = [250, 500, 1000, 2000, 5000];
+
+async function geocodeAddress(address: string): Promise<{ lat: number; lng: number; formattedAddress: string } | null> {
+  const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  if (!key) return null;
+  try {
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&components=country:IE&key=${key}`;
+    const res = await fetch(url);
+    const json = await res.json();
+    if (json.status !== 'OK' || !json.results?.length) return null;
+    const result = json.results[0];
+    return {
+      lat: result.geometry.location.lat,
+      lng: result.geometry.location.lng,
+      formattedAddress: result.formatted_address,
+    };
+  } catch {
+    return null;
+  }
+}
 
 function StepIndicator({ steps, current }: { steps: string[]; current: number }) {
   return (
@@ -124,7 +146,10 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
     radius: 1000,
     latitude: null,
     longitude: null,
+    resolvedAddress: null,
   });
+  const [geocoding, setGeocoding] = useState(false);
+  const [geocodeError, setGeocodeError] = useState('');
 
   const createAlert = useCreateAlert();
 
@@ -134,6 +159,7 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
 
   const reset = () => {
     setStep('type');
+    setGeocodeError('');
     setState({
       alertType: null,
       scope: null,
@@ -142,6 +168,7 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
       radius: 1000,
       latitude: null,
       longitude: null,
+      resolvedAddress: null,
     });
   };
 
@@ -150,22 +177,43 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
     onOpenChange(false);
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    // Geocode address before advancing from location step for radius alerts
+    if (step === 'location' && state.scope === 'radius') {
+      if (!state.address.trim()) return;
+      setGeocodeError('');
+      setGeocoding(true);
+      const result = await geocodeAddress(state.address);
+      setGeocoding(false);
+      if (!result) {
+        setGeocodeError('Could not find that address in Ireland. Please try a more specific address.');
+        return;
+      }
+      setState((s) => ({
+        ...s,
+        latitude: result.lat,
+        longitude: result.lng,
+        resolvedAddress: result.formattedAddress,
+      }));
+    }
+
     const nextIdx = currentIdx + 1;
     if (nextIdx < STEPS.length) setStep(STEPS[nextIdx]!);
   };
 
   const handleBack = () => {
+    setGeocodeError('');
     const prevIdx = currentIdx - 1;
     if (prevIdx >= 0) setStep(STEPS[prevIdx]!);
   };
 
   const canProceed = () => {
+    if (geocoding) return false;
     if (step === 'type') return !!state.alertType;
     if (step === 'scope') return !!state.scope;
     if (step === 'location') {
       if (state.scope === 'authority') return !!state.planningAuthority;
-      if (state.scope === 'radius') return !!state.address && state.radius > 0;
+      if (state.scope === 'radius') return !!state.address.trim() && state.radius > 0;
       if (state.scope === 'nationwide') return true;
     }
     return true;
@@ -329,18 +377,33 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
                   </label>
                   <Input
                     value={state.address}
-                    onChange={(e) => setState((s) => ({ ...s, address: e.target.value }))}
+                    onChange={(e) => setState((s) => ({ ...s, address: e.target.value, latitude: null, longitude: null, resolvedAddress: null }))}
                     placeholder="e.g. 14 Fitzwilliam Square, Dublin 2"
                     className="h-9"
+                    disabled={geocoding}
                   />
-                  <p className="text-xs text-foreground-subtle">
-                    Enter a street address — we&apos;ll geocode it automatically.
-                  </p>
+                  {state.resolvedAddress && !geocoding && (
+                    <div className="flex items-center gap-1.5 text-xs text-emerald-600">
+                      <Check className="h-3 w-3" />
+                      <span>Located: {state.resolvedAddress}</span>
+                    </div>
+                  )}
+                  {geocodeError && (
+                    <div className="flex items-center gap-1.5 text-xs text-destructive">
+                      <AlertCircle className="h-3 w-3" />
+                      <span>{geocodeError}</span>
+                    </div>
+                  )}
+                  {!state.resolvedAddress && !geocodeError && (
+                    <p className="text-xs text-foreground-subtle">
+                      Enter a street address — we&apos;ll locate it on the map.
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-foreground-muted">
-                    Radius: <span className="text-foreground">{(state.radius / 1000).toFixed(2)}km</span>
+                    Radius: <span className="text-foreground">{state.radius < 1000 ? `${state.radius}m` : `${(state.radius / 1000).toFixed(1)}km`}</span>
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {RADIUS_OPTIONS.map((r) => (
@@ -395,7 +458,7 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
               )}
               {state.scope === 'radius' && (
                 <>
-                  <SummaryRow label="Address" value={state.address} />
+                  <SummaryRow label="Address" value={state.resolvedAddress ?? state.address} />
                   <SummaryRow
                     label="Radius"
                     value={state.radius < 1000 ? `${state.radius}m` : `${state.radius / 1000}km`}
@@ -412,6 +475,7 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
             variant="ghost"
             size="sm"
             onClick={currentIdx === 0 ? handleClose : handleBack}
+            disabled={geocoding}
             className="gap-1.5 text-foreground-muted"
           >
             {currentIdx === 0 ? (
@@ -434,8 +498,17 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
               disabled={!canProceed()}
               className="gap-1.5 bg-brand-500 hover:bg-brand-600"
             >
-              Continue
-              <ChevronRight className="h-3.5 w-3.5" />
+              {geocoding ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Locating…
+                </>
+              ) : (
+                <>
+                  Continue
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </>
+              )}
             </Button>
           ) : (
             <Button
@@ -444,8 +517,17 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
               disabled={createAlert.isPending}
               className="gap-1.5 bg-brand-500 hover:bg-brand-600"
             >
-              <Bell className="h-3.5 w-3.5" />
-              {createAlert.isPending ? 'Creating…' : 'Create Alert'}
+              {createAlert.isPending ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Creating…
+                </>
+              ) : (
+                <>
+                  <Bell className="h-3.5 w-3.5" />
+                  Create Alert
+                </>
+              )}
             </Button>
           )}
         </div>

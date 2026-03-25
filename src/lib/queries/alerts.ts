@@ -69,6 +69,7 @@ export function useArchiveAlert() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.alerts.all });
       qc.invalidateQueries({ queryKey: queryKeys.alerts.unreadCount });
+      qc.invalidateQueries({ queryKey: [...queryKeys.alerts.all, 'stats'] });
     },
   });
 }
@@ -81,6 +82,7 @@ export function useBulkUpdateAlerts() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.alerts.all });
       qc.invalidateQueries({ queryKey: queryKeys.alerts.unreadCount });
+      qc.invalidateQueries({ queryKey: [...queryKeys.alerts.all, 'stats'] });
     },
   });
 }
