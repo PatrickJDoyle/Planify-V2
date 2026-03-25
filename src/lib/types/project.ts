@@ -6,6 +6,9 @@ export interface Project {
   longitude: number | null;
   applicationIds: number[];
   notes: string;
+  source?: 'manual' | 'location';
+  locationId?: number | null;
+  isPrimaryLocation?: boolean;
   createdAt: string;
   updatedAt: string;
 }

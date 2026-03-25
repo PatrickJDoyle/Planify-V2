@@ -1,17 +1,22 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FolderOpen, Plus, Trash2, ArrowRight, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Input } from '@/components/ui/input';
 import { useProjectsStore } from '@/lib/stores/projects-store';
+import { useUserProfile } from '@/lib/queries/user';
 
 export default function ProjectsPage() {
   const router = useRouter();
+  const { profile, isLoading: profileLoading } = useUserProfile();
   const projects = useProjectsStore((state) => state.projects);
+  const locationBootstrapComplete = useProjectsStore((state) => state.locationBootstrapComplete);
+  const bootstrapFromLocations = useProjectsStore((state) => state.bootstrapFromLocations);
   const createProject = useProjectsStore((state) => state.createProject);
   const deleteProject = useProjectsStore((state) => state.deleteProject);
 
@@ -27,6 +32,20 @@ export default function ProjectsPage() {
       }),
     [projects],
   );
+  const syncedLocationProjects = useMemo(
+    () => sortedProjects.filter((project) => project.source === 'location').length,
+    [sortedProjects],
+  );
+
+  useEffect(() => {
+    if (profileLoading || locationBootstrapComplete) return;
+    bootstrapFromLocations(profile?.locations ?? []);
+  }, [
+    profileLoading,
+    locationBootstrapComplete,
+    profile?.locations,
+    bootstrapFromLocations,
+  ]);
 
   const handleCreateProject = () => {
     if (!canCreate) return;
@@ -48,6 +67,11 @@ export default function ProjectsPage() {
           <p className="mt-0.5 text-sm text-foreground-muted">
             Organise site intelligence, monitored applications, alerts, and notes by project.
           </p>
+          {syncedLocationProjects > 0 && (
+            <p className="mt-1 text-xs text-foreground-subtle">
+              {syncedLocationProjects} project{syncedLocationProjects === 1 ? '' : 's'} synced from saved profile locations.
+            </p>
+          )}
         </div>
         <Button
           size="sm"
@@ -117,7 +141,19 @@ export default function ProjectsPage() {
               <CardContent className="space-y-4 p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-foreground">{project.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-semibold text-foreground">{project.name}</p>
+                      {project.source === 'location' && (
+                        <Badge variant="outline" className="text-[10px]">
+                          Synced
+                        </Badge>
+                      )}
+                      {project.isPrimaryLocation && (
+                        <Badge className="bg-brand-500/10 text-[10px] text-brand-500">
+                          Primary
+                        </Badge>
+                      )}
+                    </div>
                     <p className="mt-1 line-clamp-2 text-xs text-foreground-muted">{project.address}</p>
                   </div>
                   <Button

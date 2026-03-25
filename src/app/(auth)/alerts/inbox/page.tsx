@@ -184,7 +184,7 @@ function InboxItem({
 export default function InboxPage() {
   const router = useRouter();
   const { tier, isLoading: profileLoading } = useUserProfile();
-  const canAccessAlerts = tier !== 'free';
+  const canAccessAlerts = tier === 'personal' || tier === 'enterprise';
   const [filters, setFilters] = useState<InboxFilters>({ page: 1, pageSize: 20 });
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'starred' | 'archived'>('all');
@@ -281,9 +281,9 @@ export default function InboxPage() {
                 <Lock className="h-4 w-4 text-brand-500" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-foreground">Inbox is available on paid plans</p>
+                <p className="text-sm font-semibold text-foreground">Inbox is available on Personal and Enterprise</p>
                 <p className="mt-1 text-xs text-foreground-muted">
-                  Upgrade to Personal or Enterprise to access alert inbox workflows.
+                  Upgrade your account tier to access alert inbox workflows.
                 </p>
               </div>
             </div>

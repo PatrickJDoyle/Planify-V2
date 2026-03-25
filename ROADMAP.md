@@ -86,12 +86,12 @@
 |------|--------|
 | `/projects` — project list page (create, list, delete) | ✅ Done |
 | `/projects/[id]` — project workspace shell with tabs | ✅ Done |
-| Site Intelligence tab: zoning, nearby apps, commencements, sales | 🚧 In progress |
+| Site Intelligence tab: zoning, nearby apps, commencements, sales | ✅ Done |
 | Monitored Applications tab: pinned applications for this project | ✅ Done |
-| Alerts tab: radius alert scoped to project site | 🚧 In progress |
+| Alerts tab: radius alert scoped to project site | ✅ Done |
 | Notes tab: client-side notes per project | ✅ Done |
 | "Add to Project" button on Application Detail page | ✅ Done |
-| Project persistence strategy (user_locations + favourites API) | 🚧 In progress |
+| Project persistence strategy (user_locations + favourites API) | ✅ Done |
 
 ---
 

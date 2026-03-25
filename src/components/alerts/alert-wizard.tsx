@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   MapPin,
   Building2,
@@ -32,6 +32,7 @@ import type { AlertScope, AlertType } from '@/lib/types/alerts';
 interface AlertWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialState?: Partial<WizardState>;
 }
 
 type Step = 'type' | 'scope' | 'location' | 'confirm';
@@ -85,7 +86,7 @@ const SCOPES: { id: AlertScope; label: string; description: string; icon: React.
   },
 ];
 
-const RADIUS_OPTIONS = [250, 500, 1000, 2000, 5000];
+const BASE_RADIUS_OPTIONS = [250, 500, 1000, 2000, 5000, 10000, 20000];
 
 async function geocodeAddress(address: string): Promise<{ lat: number; lng: number; formattedAddress: string } | null> {
   const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
@@ -104,6 +105,33 @@ async function geocodeAddress(address: string): Promise<{ lat: number; lng: numb
   } catch {
     return null;
   }
+}
+
+function defaultWizardState(overrides?: Partial<WizardState>): WizardState {
+  const baseState: WizardState = {
+    alertType: null,
+    scope: null,
+    planningAuthority: '',
+    keywordIds: [],
+    address: '',
+    radius: 1000,
+    latitude: null,
+    longitude: null,
+    resolvedAddress: null,
+    ...overrides,
+  };
+  baseState.keywordIds = overrides?.keywordIds ?? [];
+  return baseState;
+}
+
+function getInitialStep(state: WizardState): Step {
+  if (!state.alertType) return 'type';
+  if (!state.scope) return 'scope';
+  return 'location';
+}
+
+function formatMeters(value: number) {
+  return value < 1000 ? `${value}m` : `${(value / 1000).toFixed(value % 1000 === 0 ? 0 : 1)}km`;
 }
 
 function StepIndicator({ steps, current }: { steps: string[]; current: number }) {
@@ -138,24 +166,15 @@ function StepIndicator({ steps, current }: { steps: string[]; current: number })
   );
 }
 
-export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
-  const { profile, tier } = useUserProfile();
+export function AlertWizard({ open, onOpenChange, initialState }: AlertWizardProps) {
+  const { profile, tier, limits } = useUserProfile();
+  const createAlert = useCreateAlert();
+
   const [step, setStep] = useState<Step>('type');
-  const [state, setState] = useState<WizardState>({
-    alertType: null,
-    scope: null,
-    planningAuthority: '',
-    keywordIds: [],
-    address: '',
-    radius: 1000,
-    latitude: null,
-    longitude: null,
-    resolvedAddress: null,
-  });
+  const [state, setState] = useState<WizardState>(() => defaultWizardState(initialState));
   const [geocoding, setGeocoding] = useState(false);
   const [geocodeError, setGeocodeError] = useState('');
 
-  const createAlert = useCreateAlert();
   const keywords = useMemo(() => profile?.keywords ?? [], [profile?.keywords]);
   const canUseAdvancedScopes = tier === 'enterprise';
   const selectedKeywords = useMemo(
@@ -163,24 +182,43 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
     [keywords, state.keywordIds],
   );
 
+  const maxRadiusMeters = useMemo(() => {
+    if (limits.maxAlertRadius == null) return null;
+    return Math.round(limits.maxAlertRadius * 1000);
+  }, [limits.maxAlertRadius]);
+
+  const radiusOptions = useMemo(() => {
+    if (maxRadiusMeters == null) return BASE_RADIUS_OPTIONS;
+    const allowed = BASE_RADIUS_OPTIONS.filter((value) => value <= maxRadiusMeters);
+    if (allowed.length === 0) return [maxRadiusMeters];
+    if (allowed.includes(maxRadiusMeters)) return allowed;
+    return [...allowed, maxRadiusMeters];
+  }, [maxRadiusMeters]);
+
   const STEPS: Step[] = ['type', 'scope', 'location', 'confirm'];
   const stepLabels = ['Type', 'Scope', 'Location', 'Confirm'];
   const currentIdx = STEPS.indexOf(step);
 
-  const reset = () => {
-    setStep('type');
+  useEffect(() => {
+    if (!open) return;
+    const nextState = defaultWizardState(initialState);
+    setState(nextState);
+    setStep(getInitialStep(nextState));
     setGeocodeError('');
-    setState({
-      alertType: null,
-      scope: null,
-      planningAuthority: '',
-      keywordIds: [],
-      address: '',
-      radius: 1000,
-      latitude: null,
-      longitude: null,
-      resolvedAddress: null,
-    });
+    createAlert.reset();
+  }, [open, initialState, createAlert]);
+
+  useEffect(() => {
+    if (state.scope !== 'radius' || maxRadiusMeters == null) return;
+    if (state.radius <= maxRadiusMeters) return;
+    setState((current) => ({ ...current, radius: maxRadiusMeters }));
+  }, [state.scope, state.radius, maxRadiusMeters]);
+
+  const reset = () => {
+    const nextState = defaultWizardState(initialState);
+    setStep(getInitialStep(nextState));
+    setState(nextState);
+    setGeocodeError('');
     createAlert.reset();
   };
 
@@ -190,23 +228,27 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
   };
 
   const handleNext = async () => {
-    // Geocode address before advancing from location step for radius alerts
+    // Geocode address before advancing from location step for radius alerts,
+    // unless coordinates were already provided (e.g. from project workspace prefill).
     if (step === 'location' && state.scope === 'radius') {
       if (!state.address.trim()) return;
-      setGeocodeError('');
-      setGeocoding(true);
-      const result = await geocodeAddress(state.address);
-      setGeocoding(false);
-      if (!result) {
-        setGeocodeError('Could not find that address in Ireland. Please try a more specific address.');
-        return;
+      const hasCoordinates = state.latitude !== null && state.longitude !== null;
+      if (!hasCoordinates) {
+        setGeocodeError('');
+        setGeocoding(true);
+        const result = await geocodeAddress(state.address);
+        setGeocoding(false);
+        if (!result) {
+          setGeocodeError('Could not find that address in Ireland. Please try a more specific address.');
+          return;
+        }
+        setState((current) => ({
+          ...current,
+          latitude: result.lat,
+          longitude: result.lng,
+          resolvedAddress: result.formattedAddress,
+        }));
       }
-      setState((s) => ({
-        ...s,
-        latitude: result.lat,
-        longitude: result.lng,
-        resolvedAddress: result.formattedAddress,
-      }));
     }
 
     const nextIdx = currentIdx + 1;
@@ -237,7 +279,11 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
         if (!canUseAdvancedScopes || keywords.length === 0) return false;
         return !!state.planningAuthority && state.keywordIds.length > 0;
       }
-      if (state.scope === 'radius') return !!state.address.trim() && state.radius > 0;
+      if (state.scope === 'radius') {
+        if (!state.address.trim() || state.radius <= 0) return false;
+        if (maxRadiusMeters != null && state.radius > maxRadiusMeters) return false;
+        return true;
+      }
       if (state.scope === 'nationwide') {
         if (!canUseAdvancedScopes || keywords.length === 0) return false;
         return state.keywordIds.length > 0;
@@ -247,6 +293,11 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
   };
 
   const handleCreate = () => {
+    const boundedRadius =
+      state.scope === 'radius' && maxRadiusMeters != null
+        ? Math.min(state.radius, maxRadiusMeters)
+        : state.radius;
+
     createAlert.mutate(
       {
         alertType: state.alertType!,
@@ -257,7 +308,7 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
             ? state.keywordIds
             : undefined,
         address: state.address || undefined,
-        radius: state.scope === 'radius' ? state.radius : undefined,
+        radius: state.scope === 'radius' ? boundedRadius : undefined,
         latitude: state.latitude ?? undefined,
         longitude: state.longitude ?? undefined,
       },
@@ -293,13 +344,13 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
         {/* Step: Type */}
         {step === 'type' && (
           <div className="space-y-2 py-1">
-            {ALERT_TYPES.map((t) => (
+            {ALERT_TYPES.map((type) => (
               <button
-                key={t.id}
-                onClick={() => setState((s) => ({ ...s, alertType: t.id }))}
+                key={type.id}
+                onClick={() => setState((current) => ({ ...current, alertType: type.id }))}
                 className={cn(
                   'flex w-full items-start gap-3 rounded-lg border p-4 text-left transition-colors',
-                  state.alertType === t.id
+                  state.alertType === type.id
                     ? 'border-brand-500 bg-brand-500/5'
                     : 'border-border hover:border-brand-500/40 hover:bg-background-subtle',
                 )}
@@ -307,21 +358,21 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
                 <div
                   className={cn(
                     'flex h-8 w-8 shrink-0 items-center justify-center rounded-md',
-                    state.alertType === t.id ? 'bg-brand-500/15' : 'bg-background-muted',
+                    state.alertType === type.id ? 'bg-brand-500/15' : 'bg-background-muted',
                   )}
                 >
-                  <t.icon
+                  <type.icon
                     className={cn(
                       'h-4 w-4',
-                      state.alertType === t.id ? 'text-brand-500' : 'text-foreground-muted',
+                      state.alertType === type.id ? 'text-brand-500' : 'text-foreground-muted',
                     )}
                   />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-foreground">{t.label}</p>
-                  <p className="mt-0.5 text-xs text-foreground-muted">{t.description}</p>
+                  <p className="text-sm font-medium text-foreground">{type.label}</p>
+                  <p className="mt-0.5 text-xs text-foreground-muted">{type.description}</p>
                 </div>
-                {state.alertType === t.id && (
+                {state.alertType === type.id && (
                   <div className="ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-500">
                     <Check className="h-3 w-3 text-white" />
                   </div>
@@ -334,57 +385,59 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
         {/* Step: Scope */}
         {step === 'scope' && (
           <div className="space-y-2 py-1">
-            {SCOPES.map((s) => {
+            {SCOPES.map((scopeConfig) => {
               const isLockedScope =
-                (s.id === 'authority' || s.id === 'nationwide') &&
+                (scopeConfig.id === 'authority' || scopeConfig.id === 'nationwide') &&
                 !canUseAdvancedScopes;
 
               return (
                 <button
-                  key={s.id}
+                  key={scopeConfig.id}
                   onClick={() => {
                     if (isLockedScope) return;
-                    setState((prev) => ({
-                      ...prev,
-                      scope: s.id,
-                      keywordIds: s.id === 'radius' ? [] : prev.keywordIds,
+                    setState((current) => ({
+                      ...current,
+                      scope: scopeConfig.id,
+                      planningAuthority: scopeConfig.id === 'authority' ? current.planningAuthority : '',
+                      keywordIds: scopeConfig.id === 'radius' ? [] : current.keywordIds,
                     }));
                   }}
                   disabled={isLockedScope}
                   className={cn(
                     'flex w-full items-start gap-3 rounded-lg border p-4 text-left transition-colors',
-                    state.scope === s.id
+                    state.scope === scopeConfig.id
                       ? 'border-brand-500 bg-brand-500/5'
                       : 'border-border hover:border-brand-500/40 hover:bg-background-subtle',
-                    isLockedScope && 'cursor-not-allowed opacity-50 hover:border-border hover:bg-transparent',
+                    isLockedScope &&
+                      'cursor-not-allowed opacity-50 hover:border-border hover:bg-transparent',
                   )}
                 >
                   <div
                     className={cn(
                       'flex h-8 w-8 shrink-0 items-center justify-center rounded-md',
-                      state.scope === s.id ? 'bg-brand-500/15' : 'bg-background-muted',
+                      state.scope === scopeConfig.id ? 'bg-brand-500/15' : 'bg-background-muted',
                     )}
                   >
-                    <s.icon
+                    <scopeConfig.icon
                       className={cn(
                         'h-4 w-4',
-                        state.scope === s.id ? 'text-brand-500' : 'text-foreground-muted',
+                        state.scope === scopeConfig.id ? 'text-brand-500' : 'text-foreground-muted',
                       )}
                     />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-foreground">{s.label}</p>
-                      {s.enterprise && (
+                      <p className="text-sm font-medium text-foreground">{scopeConfig.label}</p>
+                      {scopeConfig.enterprise && (
                         <Badge className="bg-brand-500/10 text-[10px] text-brand-500">Enterprise</Badge>
                       )}
                       {isLockedScope && (
                         <Badge variant="outline" className="text-[10px]">Locked</Badge>
                       )}
                     </div>
-                    <p className="mt-0.5 text-xs text-foreground-muted">{s.description}</p>
+                    <p className="mt-0.5 text-xs text-foreground-muted">{scopeConfig.description}</p>
                   </div>
-                  {state.scope === s.id && (
+                  {state.scope === scopeConfig.id && (
                     <div className="ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-500">
                       <Check className="h-3 w-3 text-white" />
                     </div>
@@ -406,14 +459,14 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
                   </label>
                   <select
                     value={state.planningAuthority}
-                    onChange={(e) => setState((s) => ({ ...s, planningAuthority: e.target.value }))}
+                    onChange={(event) => setState((current) => ({ ...current, planningAuthority: event.target.value }))}
                     className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                     disabled={!canUseAdvancedScopes}
                   >
                     <option value="">Select an authority…</option>
-                    {PLANNING_AUTHORITIES.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name}
+                    {PLANNING_AUTHORITIES.map((authority) => (
+                      <option key={authority.id} value={authority.id}>
+                        {authority.name}
                       </option>
                     ))}
                   </select>
@@ -435,7 +488,15 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
                   </label>
                   <Input
                     value={state.address}
-                    onChange={(e) => setState((s) => ({ ...s, address: e.target.value, latitude: null, longitude: null, resolvedAddress: null }))}
+                    onChange={(event) =>
+                      setState((current) => ({
+                        ...current,
+                        address: event.target.value,
+                        latitude: null,
+                        longitude: null,
+                        resolvedAddress: null,
+                      }))
+                    }
                     placeholder="e.g. 14 Fitzwilliam Square, Dublin 2"
                     className="h-9"
                     disabled={geocoding}
@@ -454,28 +515,33 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
                   )}
                   {!state.resolvedAddress && !geocodeError && (
                     <p className="text-xs text-foreground-subtle">
-                      Enter a street address — we&apos;ll locate it on the map.
+                      Enter a street address and continue to validate it.
                     </p>
                   )}
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-foreground-muted">
-                    Radius: <span className="text-foreground">{state.radius < 1000 ? `${state.radius}m` : `${(state.radius / 1000).toFixed(1)}km`}</span>
+                    Radius: <span className="text-foreground">{formatMeters(state.radius)}</span>
                   </label>
+                  {maxRadiusMeters != null && (
+                    <p className="text-xs text-foreground-subtle">
+                      Your plan supports up to {formatMeters(maxRadiusMeters)} for radius alerts.
+                    </p>
+                  )}
                   <div className="flex flex-wrap gap-2">
-                    {RADIUS_OPTIONS.map((r) => (
+                    {radiusOptions.map((radius) => (
                       <button
-                        key={r}
-                        onClick={() => setState((s) => ({ ...s, radius: r }))}
+                        key={radius}
+                        onClick={() => setState((current) => ({ ...current, radius }))}
                         className={cn(
                           'rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
-                          state.radius === r
+                          state.radius === radius
                             ? 'border-brand-500 bg-brand-500/10 text-brand-500'
                             : 'border-border text-foreground-muted hover:border-brand-500/40',
                         )}
                       >
-                        {r < 1000 ? `${r}m` : `${r / 1000}km`}
+                        {formatMeters(radius)}
                       </button>
                     ))}
                   </div>
@@ -508,16 +574,19 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
         {step === 'confirm' && (
           <div className="space-y-3 py-1">
             <div className="divide-y rounded-lg border border-border">
-              <SummaryRow label="Alert type" value={state.alertType === 'new_application' ? 'New applications' : 'Status updates'} />
+              <SummaryRow
+                label="Alert type"
+                value={state.alertType === 'new_application' ? 'New applications' : 'Status updates'}
+              />
               <SummaryRow
                 label="Scope"
-                value={SCOPES.find((s) => s.id === state.scope)?.label ?? '—'}
+                value={SCOPES.find((scopeConfig) => scopeConfig.id === state.scope)?.label ?? '—'}
               />
               {state.scope === 'authority' && (
                 <SummaryRow
                   label="Authority"
                   value={
-                    PLANNING_AUTHORITIES.find((a) => a.id === state.planningAuthority)?.name ??
+                    PLANNING_AUTHORITIES.find((authority) => authority.id === state.planningAuthority)?.name ??
                     state.planningAuthority
                   }
                 />
@@ -535,10 +604,7 @@ export function AlertWizard({ open, onOpenChange }: AlertWizardProps) {
               {state.scope === 'radius' && (
                 <>
                   <SummaryRow label="Address" value={state.resolvedAddress ?? state.address} />
-                  <SummaryRow
-                    label="Radius"
-                    value={state.radius < 1000 ? `${state.radius}m` : `${state.radius / 1000}km`}
-                  />
+                  <SummaryRow label="Radius" value={formatMeters(state.radius)} />
                 </>
               )}
             </div>

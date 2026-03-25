@@ -60,11 +60,11 @@ export interface TierLimits {
 export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
   free: {
     // Base free tier (minimal/unonboarded)
-    maxAlerts: null,
+    maxAlerts: 1,
     maxFavourites: null,
-    maxAlertRadius: null,
-    maxKeywords: null,
-    maxLocations: null,
+    maxAlertRadius: 0.3, // km
+    maxKeywords: 0,
+    maxLocations: 1,
     hasNationwideAccess: false,
     canExport: false,
     canUsePrePlanning: false,
@@ -72,10 +72,10 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
   },
   personal: {
     // Personal tier (free plan for standard users)
-    maxAlerts: 10,
-    maxFavourites: 50,
-    maxAlertRadius: 2, // km
-    maxKeywords: null,
+    maxAlerts: 2,
+    maxFavourites: 3,
+    maxAlertRadius: 1, // km
+    maxKeywords: 3,
     maxLocations: 2,
     hasNationwideAccess: false,
     canExport: false,
@@ -84,10 +84,10 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
   },
   enterprise: {
     // Enterprise tier (paid professional plan)
-    maxAlerts: null,
+    maxAlerts: 18,
     maxFavourites: null,
-    maxAlertRadius: null,
-    maxKeywords: 30,
+    maxAlertRadius: 20, // km
+    maxKeywords: 10,
     maxLocations: 3,
     hasNationwideAccess: true,
     canExport: true,

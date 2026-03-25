@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bell,
   Plus,
@@ -154,8 +154,9 @@ function UsageBar({ used, max, label }: { used: number; max: number | null; labe
 
 export default function AlertsPage() {
   const router = useRouter();
+  const [queryString, setQueryString] = useState('');
   const { limits, isPaid, tier, isLoading: profileLoading } = useUserProfile();
-  const canAccessAlerts = tier !== 'free';
+  const canAccessAlerts = tier === 'personal' || tier === 'enterprise';
   const {
     data: alerts,
     isLoading,
@@ -166,10 +167,57 @@ export default function AlertsPage() {
   const deleteAlert = useDeleteAlert();
   const [wizardOpen, setWizardOpen] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
+  const openedFromQueryRef = useRef(false);
+  const queryParams = useMemo(() => new URLSearchParams(queryString), [queryString]);
+
+  useEffect(() => {
+    setQueryString(window.location.search ?? '');
+  }, []);
+
+  const wizardInitialState = useMemo(() => {
+    const scope = queryParams.get('scope') as AlertScope | null;
+    const address = queryParams.get('address')?.trim() ?? '';
+    const latParam = queryParams.get('lat');
+    const lngParam = queryParams.get('lng');
+    const radiusParam = queryParams.get('radius');
+    const alertTypeParam = queryParams.get('alertType') as AlertType | null;
+
+    const latitude = latParam ? Number(latParam) : null;
+    const longitude = lngParam ? Number(lngParam) : null;
+    const radius = radiusParam ? Number(radiusParam) : undefined;
+
+    return {
+      alertType: alertTypeParam ?? 'new_application',
+      scope: scope ?? 'radius',
+      address,
+      resolvedAddress: address || null,
+      radius: Number.isFinite(radius) && radius! > 0 ? radius : 1000,
+      latitude: Number.isFinite(latitude) ? latitude : null,
+      longitude: Number.isFinite(longitude) ? longitude : null,
+    };
+  }, [queryParams]);
 
   const alertCount = alerts?.length ?? 0;
   const maxAlerts = limits.maxAlerts;
   const atLimit = maxAlerts !== null && alertCount >= maxAlerts;
+
+  useEffect(() => {
+    const shouldAutoOpen = queryParams.get('create') === '1';
+    if (!shouldAutoOpen || openedFromQueryRef.current || profileLoading) return;
+    openedFromQueryRef.current = true;
+
+    if (!canAccessAlerts || !isPaid) {
+      setPaywallOpen(true);
+      return;
+    }
+
+    if (atLimit) {
+      setPaywallOpen(true);
+      return;
+    }
+
+    setWizardOpen(true);
+  }, [queryParams, profileLoading, canAccessAlerts, isPaid, atLimit]);
 
   const handleNewAlert = () => {
     if (!canAccessAlerts) {
@@ -234,9 +282,9 @@ export default function AlertsPage() {
                   <Lock className="h-4 w-4 text-brand-500" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-foreground">Alerts are available on paid plans</p>
+                  <p className="text-sm font-semibold text-foreground">Alerts are available on Personal and Enterprise</p>
                   <p className="mt-1 text-xs text-foreground-muted">
-                    Upgrade to Personal or Enterprise to create and manage alerts and inbox updates.
+                    Upgrade your account tier to create and manage alerts and inbox updates.
                   </p>
                 </div>
               </div>
@@ -341,14 +389,18 @@ export default function AlertsPage() {
         )}
       </div>
 
-      <AlertWizard open={wizardOpen} onOpenChange={setWizardOpen} />
+      <AlertWizard
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
+        initialState={wizardInitialState}
+      />
       <PaywallModal
         open={paywallOpen}
         onOpenChange={setPaywallOpen}
         feature="Alerts"
         description={
           !canAccessAlerts
-            ? 'Alerts and inbox workflows are available on Personal and Enterprise plans.'
+            ? 'Alerts and inbox workflows are available on Personal and Enterprise tiers.'
             : atLimit
             ? `You're on the ${tier} plan which allows up to ${maxAlerts} alerts. Upgrade to create unlimited alerts.`
             : undefined

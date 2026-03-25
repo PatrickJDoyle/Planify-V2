@@ -1,12 +1,21 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type { CreateProjectInput, Project } from '@/lib/types/project';
+import type { UserLocation } from '@/lib/types/user';
 
 interface ProjectsStore {
   projects: Project[];
+  locationBootstrapComplete: boolean;
+  bootstrapFromLocations: (locations: UserLocation[]) => void;
   createProject: (input: CreateProjectInput) => Project;
   deleteProject: (projectId: string) => void;
   renameProject: (projectId: string, name: string) => void;
+  setProjectLocation: (
+    projectId: string,
+    latitude: number,
+    longitude: number,
+    resolvedAddress?: string,
+  ) => void;
   updateNotes: (projectId: string, notes: string) => void;
   addApplicationToProject: (projectId: string, applicationId: number) => void;
   removeApplicationFromProject: (projectId: string, applicationId: number) => void;
@@ -30,6 +39,51 @@ export const useProjectsStore = create<ProjectsStore>()(
   persist(
     (set) => ({
       projects: [],
+      locationBootstrapComplete: false,
+
+      bootstrapFromLocations: (locations) => {
+        set((state) => {
+          if (state.locationBootstrapComplete) return state;
+
+          if (!locations.length) {
+            return { locationBootstrapComplete: true };
+          }
+
+          const existingLocationIds = new Set(
+            state.projects
+              .map((project) => project.locationId)
+              .filter((locationId): locationId is number => typeof locationId === 'number'),
+          );
+
+          const importedProjects: Project[] = locations
+            .filter((location) => !existingLocationIds.has(location.id))
+            .map((location) => ({
+              id: `loc_${location.id}`,
+              name:
+                location.name?.trim() ||
+                (location.isPrimary ? 'Primary Location Project' : 'Location Project'),
+              address: location.address,
+              latitude: location.latitude,
+              longitude: location.longitude,
+              applicationIds: [],
+              notes: '',
+              source: 'location',
+              locationId: location.id,
+              isPrimaryLocation: location.isPrimary,
+              createdAt: nowIso(),
+              updatedAt: nowIso(),
+            }));
+
+          if (!importedProjects.length) {
+            return { locationBootstrapComplete: true };
+          }
+
+          return {
+            projects: sortByRecent([...importedProjects, ...state.projects]),
+            locationBootstrapComplete: true,
+          };
+        });
+      },
 
       createProject: (input) => {
         const project: Project = {
@@ -40,6 +94,9 @@ export const useProjectsStore = create<ProjectsStore>()(
           longitude: input.longitude ?? null,
           applicationIds: input.applicationId ? [input.applicationId] : [],
           notes: '',
+          source: 'manual',
+          locationId: null,
+          isPrimaryLocation: false,
           createdAt: nowIso(),
           updatedAt: nowIso(),
         };
@@ -66,6 +123,24 @@ export const useProjectsStore = create<ProjectsStore>()(
             state.projects.map((project) =>
               project.id === projectId
                 ? { ...project, name: trimmed, updatedAt: nowIso() }
+                : project,
+            ),
+          ),
+        }));
+      },
+
+      setProjectLocation: (projectId, latitude, longitude, resolvedAddress) => {
+        set((state) => ({
+          projects: sortByRecent(
+            state.projects.map((project) =>
+              project.id === projectId
+                ? {
+                    ...project,
+                    latitude,
+                    longitude,
+                    address: resolvedAddress?.trim() || project.address,
+                    updatedAt: nowIso(),
+                  }
                 : project,
             ),
           ),
