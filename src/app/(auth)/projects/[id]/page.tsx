@@ -26,6 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/shared/empty-state';
 import { StatusBadge } from '@/components/shared/status-badge';
+import { ResearchAssistant } from '@/components/ai/research-assistant';
 import { useProjectsStore } from '@/lib/stores/projects-store';
 import { useFavorites } from '@/lib/queries/favorites';
 import { applicationsApi } from '@/lib/api/applications';
@@ -245,6 +246,49 @@ export default function ProjectWorkspacePage() {
     return `/alerts?${params.toString()}`;
   }, [project, analysisRadiusMeters]);
 
+  const projectAssistantContext = useMemo(() => {
+    if (!project) return '';
+
+    const contextParts = [
+      `Project name: ${project.name}`,
+      `Site address: ${project.address}`,
+      project.latitude !== null && project.longitude !== null
+        ? `Site coordinates: ${project.latitude}, ${project.longitude}`
+        : 'Site coordinates are not set yet',
+      `Current analysis radius: ${analysisRadiusMeters} meters`,
+      `Nearby applications in radius: ${siteIntelligenceQuery.data?.totalApplications ?? nearbyApplications.length}`,
+      `Nearby commencements in radius: ${nearbyBcms.length}`,
+      `Nearby property sales in radius: ${nearbySales.length}`,
+      decisionStats.grantRate !== null
+        ? `Decision grant rate for decided nearby applications: ${decisionStats.grantRate}%`
+        : 'No decided nearby applications yet',
+      siteIntelligenceQuery.data?.zoning
+        ? `Zoning: ${siteIntelligenceQuery.data.zoning.zoneGzt ?? 'Unknown'} (${siteIntelligenceQuery.data.zoning.gztDesc ?? siteIntelligenceQuery.data.zoning.zoneDesc ?? 'No description'})`
+        : 'No zoning polygon found at this site',
+    ];
+
+    return contextParts.join(' | ');
+  }, [
+    project,
+    analysisRadiusMeters,
+    siteIntelligenceQuery.data?.totalApplications,
+    siteIntelligenceQuery.data?.zoning,
+    nearbyApplications.length,
+    nearbyBcms.length,
+    nearbySales.length,
+    decisionStats.grantRate,
+  ]);
+
+  const projectAssistantSuggestions = useMemo(
+    () => [
+      `What percentage of decided applications within ${formatMeters(analysisRadiusMeters)} were granted near this site?`,
+      `Show recent residential applications within ${formatMeters(analysisRadiusMeters)} of this project`,
+      'How many nearby granted applications appear to have actually commenced construction?',
+      'What do nearby application outcomes and sales suggest about this site risk profile?',
+    ],
+    [analysisRadiusMeters],
+  );
+
   const handleLocateSite = async () => {
     if (!project?.address.trim()) {
       setLocationError('Project address is required before locating the site.');
@@ -347,6 +391,7 @@ export default function ProjectWorkspacePage() {
           <TabsTrigger value="site">Site Intelligence</TabsTrigger>
           <TabsTrigger value="apps">Monitored Applications</TabsTrigger>
           <TabsTrigger value="alerts">Alerts</TabsTrigger>
+          <TabsTrigger value="ai">AI Research</TabsTrigger>
           <TabsTrigger value="notes">Notes</TabsTrigger>
         </TabsList>
 
@@ -784,6 +829,16 @@ export default function ProjectWorkspacePage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="ai" className="space-y-4">
+          <ResearchAssistant
+            title="Project AI Research Assistant"
+            description="Ask context-aware questions grounded in nearby applications, commencements, and property sales for this project site."
+            contextPrefix={projectAssistantContext}
+            suggestions={projectAssistantSuggestions}
+            maxResults={100}
+          />
         </TabsContent>
 
         <TabsContent value="notes">

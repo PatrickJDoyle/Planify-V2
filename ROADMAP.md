@@ -99,16 +99,17 @@
 > **Goal**: Grounded AI that answers questions no other tool can answer.
 > Not a chatbot. Context-aware. Backed exclusively by real Irish planning outcomes.
 > "What % of residential extensions in Fingal were refused in the last 2 years?"
+> **Status**: ✅ DONE (Frontend integration on existing conversational backend)
 
 | Task | Status |
 |------|--------|
-| AI Research Assistant panel (embedded in Projects + Application Detail) | ⬜ Todo |
-| Wire to existing `/applications/conversational` NLP endpoint | ⬜ Todo |
-| Context injection: pass current site coordinates + authority to queries | ⬜ Todo |
-| Suggested questions based on application type / location | ⬜ Todo |
-| Commencement rate queries (BCMS data) | ⬜ Todo |
-| Property value queries (PPR data) | ⬜ Todo |
-| Citation display: show which applications back each answer | ⬜ Todo |
+| AI Research Assistant panel (embedded in Projects + Application Detail) | ✅ Done |
+| Wire to existing `/applications/conversational` NLP endpoint | ✅ Done |
+| Context injection: pass current site coordinates + authority to queries | ✅ Done |
+| Suggested questions based on application type / location | ✅ Done |
+| Commencement rate queries (BCMS data) | ✅ Done |
+| Property value queries (PPR data) | ✅ Done |
+| Citation display: show which applications back each answer | ✅ Done |
 
 ---
 

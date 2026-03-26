@@ -22,6 +22,7 @@ import { PropertySection } from '@/components/application/property-section';
 import { BcmsSection } from '@/components/application/bcms-section';
 import { NearbySalesSection } from '@/components/application/nearby-sales-section';
 import { RelatedSection } from '@/components/application/related-section';
+import { ResearchAssistant } from '@/components/ai/research-assistant';
 
 export default function ApplicationDetailPage() {
   const params = useParams<{ id: string }>();
@@ -58,6 +59,29 @@ export default function ApplicationDetailPage() {
     return <DetailPageSkeleton />;
   }
 
+  const assistantContextParts = [
+    `Application number: ${application.applicationNumber}`,
+    `Planning authority: ${application.planningAuthority || 'Unknown'}`,
+    `Site address: ${application.formattedAddress ?? application.developmentAddress}`,
+    `Coordinates: ${application.latitude}, ${application.longitude}`,
+    `Application type: ${application.displayApplicationType ?? application.applicationType ?? 'Unknown'}`,
+    `Current status: ${application.displayStatus ?? application.applicationStatus ?? 'Unknown'}`,
+    application.displayDecision || application.decision
+      ? `Decision: ${application.displayDecision ?? application.decision}`
+      : null,
+  ].filter(Boolean);
+
+  const assistantSuggestions = [
+    `Show similar ${(
+      application.displayApplicationType ??
+      application.applicationType ??
+      'planning'
+    ).toLowerCase()} applications within 1km of this site in the last 3 years`,
+    `What are refusal patterns in ${application.planningAuthority} for sites like this?`,
+    'How many nearby granted applications appear to have commenced construction?',
+    'What are nearby property sale trends around this site?',
+  ];
+
   return (
     <div className="flex min-h-screen flex-col">
       <ApplicationHeader application={application} zoning={zoning} />
@@ -74,6 +98,7 @@ export default function ApplicationDetailPage() {
               <TabsTrigger value="bcms">BCMS</TabsTrigger>
               <TabsTrigger value="prices">Nearby Sales</TabsTrigger>
               <TabsTrigger value="related">Related</TabsTrigger>
+              <TabsTrigger value="assistant">AI Research</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="mt-4">
@@ -111,6 +136,16 @@ export default function ApplicationDetailPage() {
             <TabsContent value="related" className="mt-4">
               <RelatedSection relatedApps={relatedApps} isLoading={relatedLoading} />
             </TabsContent>
+
+            <TabsContent value="assistant" className="mt-4">
+              <ResearchAssistant
+                title="Application AI Research Assistant"
+                description="Query this application context with grounded Irish planning outcomes (applications, decisions, commencements, and sales)."
+                contextPrefix={assistantContextParts.join(' | ')}
+                suggestions={assistantSuggestions}
+                maxResults={80}
+              />
+            </TabsContent>
           </Tabs>
         </div>
       </div>
@@ -146,7 +181,7 @@ function DetailPageSkeleton() {
       <div className="px-6 py-4">
         <div className="mx-auto max-w-6xl">
           <div className="flex gap-4 border-b border-border pb-2">
-            {Array.from({ length: 8 }).map((_, i) => (
+            {Array.from({ length: 9 }).map((_, i) => (
               <Skeleton key={i} className="h-4 w-16" />
             ))}
           </div>
