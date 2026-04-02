@@ -55,19 +55,20 @@ const COUNCILS = [
 ] as const;
 
 const DEVELOPMENT_TYPES = [
-  'Residential Extension',
-  'New Build',
-  'Commercial',
-  'Mixed Use',
-  'Change of Use',
+  { label: 'Residential Extension', value: 'residential_extension' },
+  { label: 'New Build', value: 'new_build' },
+  { label: 'Commercial', value: 'commercial' },
+  { label: 'Mixed Use', value: 'mixed_use' },
+  { label: 'Change of Use', value: 'change_of_use' },
 ] as const;
 
 const createProjectSchema = z.object({
-  siteAddress: z.string().min(5, 'Site address must be at least 5 characters'),
+  name: z.string().min(3, 'Project name must be at least 3 characters'),
+  address: z.string().min(5, 'Site address must be at least 5 characters'),
   eircode: z.string().optional(),
-  councilArea: z.string().min(1, 'Please select a council area'),
+  councilId: z.string().min(1, 'Please select a council area'),
   developmentType: z.string().min(1, 'Please select a development type'),
-  developmentDescription: z
+  description: z
     .string()
     .min(50, 'Description must be at least 50 characters')
     .max(2000, 'Description must be under 2000 characters'),
@@ -124,11 +125,12 @@ export default function NewProjectPage() {
   } = useForm<CreateProjectForm>({
     resolver: zodResolver(createProjectSchema),
     defaultValues: {
-      siteAddress: '',
+      name: '',
+      address: '',
       eircode: '',
-      councilArea: '',
+      councilId: '',
       developmentType: '',
-      developmentDescription: '',
+      description: '',
       siteAreaSqm: '' as unknown as undefined,
       numberOfUnits: '' as unknown as undefined,
     },
@@ -136,11 +138,12 @@ export default function NewProjectPage() {
 
   const onSubmit = async (data: CreateProjectForm) => {
     const payload = {
-      siteAddress: data.siteAddress,
+      name: data.name,
+      address: data.address,
       eircode: data.eircode || undefined,
-      councilArea: data.councilArea,
+      councilId: data.councilId,
       developmentType: data.developmentType,
-      developmentDescription: data.developmentDescription,
+      description: data.description,
       siteAreaSqm:
         data.siteAreaSqm !== '' && data.siteAreaSqm != null
           ? Number(data.siteAreaSqm)
@@ -182,21 +185,41 @@ export default function NewProjectPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            {/* Project Name */}
+            <div>
+              <FieldLabel
+                htmlFor="name"
+                label="Project Name"
+                required
+                hint="A short name for this application, e.g. 'Oak Drive Extension'"
+              />
+              <Input
+                id="name"
+                placeholder="e.g. Oak Drive Rear Extension"
+                {...register('name')}
+              />
+              {errors.name && (
+                <p className="mt-1 text-xs text-red-600">
+                  {errors.name.message}
+                </p>
+              )}
+            </div>
+
             {/* Site Address */}
             <div>
               <FieldLabel
-                htmlFor="siteAddress"
+                htmlFor="address"
                 label="Site Address"
                 required
               />
               <Input
-                id="siteAddress"
+                id="address"
                 placeholder="e.g. 12 Maple Drive, Blackrock, Co. Dublin"
-                {...register('siteAddress')}
+                {...register('address')}
               />
-              {errors.siteAddress && (
+              {errors.address && (
                 <p className="mt-1 text-xs text-red-600">
-                  {errors.siteAddress.message}
+                  {errors.address.message}
                 </p>
               )}
             </div>
@@ -219,19 +242,19 @@ export default function NewProjectPage() {
             {/* Council Area */}
             <div>
               <FieldLabel
-                htmlFor="councilArea"
+                htmlFor="councilId"
                 label="Council Area"
                 required
               />
               <Controller
-                name="councilArea"
+                name="councilId"
                 control={control}
                 render={({ field }) => (
                   <Select
                     value={field.value}
                     onValueChange={field.onChange}
                   >
-                    <SelectTrigger id="councilArea">
+                    <SelectTrigger id="councilId">
                       <SelectValue placeholder="Select council area" />
                     </SelectTrigger>
                     <SelectContent>
@@ -244,9 +267,9 @@ export default function NewProjectPage() {
                   </Select>
                 )}
               />
-              {errors.councilArea && (
+              {errors.councilId && (
                 <p className="mt-1 text-xs text-red-600">
-                  {errors.councilArea.message}
+                  {errors.councilId.message}
                 </p>
               )}
             </div>
@@ -271,8 +294,8 @@ export default function NewProjectPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {DEVELOPMENT_TYPES.map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {type}
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -289,21 +312,21 @@ export default function NewProjectPage() {
             {/* Development Description */}
             <div>
               <FieldLabel
-                htmlFor="developmentDescription"
+                htmlFor="description"
                 label="Development Description"
                 required
                 hint="Describe the proposed works in detail (min. 50 characters)"
               />
               <textarea
-                id="developmentDescription"
+                id="description"
                 rows={4}
                 placeholder="Describe the proposed development, including the nature and extent of works, materials, and any relevant details..."
                 className="flex w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground shadow-sm transition-colors placeholder:text-foreground-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
-                {...register('developmentDescription')}
+                {...register('description')}
               />
-              {errors.developmentDescription && (
+              {errors.description && (
                 <p className="mt-1 text-xs text-red-600">
-                  {errors.developmentDescription.message}
+                  {errors.description.message}
                 </p>
               )}
             </div>
