@@ -165,11 +165,13 @@ async function fetchProjectStatus(id: string): Promise<ProjectStatusResponse> {
       error: documentRun?.errorMessage,
       documents: documents.map((d) => ({
         id: d.id,
-        name: d.documentType.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+        name: d.documentType.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
         status: d.status === 'complete' ? 'complete' as const
           : d.status === 'generating' ? 'running' as const
           : 'failed' as const,
-        downloadUrl: d.fileUrl,
+        downloadUrl: d.status === 'complete'
+          ? `${apiClient.defaults.baseURL}${PLANIFY_BASE}/documents/${d.id}/download`
+          : undefined,
         error: d.warningMessage,
       })),
     },

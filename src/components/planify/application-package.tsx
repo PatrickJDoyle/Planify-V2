@@ -42,7 +42,16 @@ function getDocumentForRequirement(
   requirement: ResearchRequirement,
   documents: GeneratedDocument[],
 ): GeneratedDocument | undefined {
-  return documents.find((doc) => doc.requirementId === requirement.id);
+  // Match by requirementId if set, otherwise match by name similarity
+  const byId = documents.find((doc) => doc.requirementId === requirement.id);
+  if (byId) return byId;
+
+  // Normalize names for matching: "Planning Statement" matches document named "Planning Statement"
+  const reqNameLower = requirement.name.toLowerCase().replace(/\s+/g, '_');
+  return documents.find((doc) => {
+    const docNameLower = doc.name.toLowerCase().replace(/\s+/g, '_');
+    return docNameLower.includes(reqNameLower) || reqNameLower.includes(docNameLower);
+  });
 }
 
 function getRowStatus(
