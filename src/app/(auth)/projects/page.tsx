@@ -60,7 +60,7 @@ function ProjectRow({ project }: { project: PlanifyProject }) {
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex items-center gap-2.5">
           <p className="truncate text-sm font-semibold text-foreground">
-            {project.name || project.siteAddress}
+            {project.name || project.address}
           </p>
           <ProjectStatusBadge status={project.status} />
         </div>
@@ -68,11 +68,11 @@ function ProjectRow({ project }: { project: PlanifyProject }) {
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-foreground-muted">
           <span className="inline-flex items-center gap-1">
             <MapPin className="h-3 w-3" />
-            {project.siteAddress}
+            {project.address}
           </span>
           <span className="inline-flex items-center gap-1">
             <Building2 className="h-3 w-3" />
-            {project.councilArea}
+            {project.councilId}
           </span>
           <span>{project.developmentType}</span>
           <span className="inline-flex items-center gap-1">
@@ -118,8 +118,8 @@ export default function ProjectsPage() {
       filtered = filtered.filter(
         (p) =>
           p.name?.toLowerCase().includes(q) ||
-          p.siteAddress?.toLowerCase().includes(q) ||
-          p.councilArea?.toLowerCase().includes(q) ||
+          p.address?.toLowerCase().includes(q) ||
+          p.councilId?.toLowerCase().includes(q) ||
           p.developmentType?.toLowerCase().includes(q),
       );
     }

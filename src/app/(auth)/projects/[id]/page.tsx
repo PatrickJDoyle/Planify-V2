@@ -141,24 +141,24 @@ export default function ProjectDetailPage() {
               <div className="min-w-0 space-y-2">
                 <div className="flex items-center gap-2.5">
                   <h1 className="text-xl font-semibold text-foreground">
-                    {project.name || project.siteAddress}
+                    {project.name || project.address}
                   </h1>
                   <ProjectStatusBadge status={project.status} />
                 </div>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-foreground-muted">
                   <span className="inline-flex items-center gap-1.5">
                     <MapPin className="h-3.5 w-3.5" />
-                    {project.siteAddress}
+                    {project.address}
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <Building2 className="h-3.5 w-3.5" />
-                    {project.councilArea}
+                    {project.councilId}
                   </span>
                   <span>{project.developmentType}</span>
                 </div>
-                {project.developmentDescription && (
+                {project.description && (
                   <p className="text-sm text-foreground-muted line-clamp-2">
-                    {project.developmentDescription}
+                    {project.description}
                   </p>
                 )}
               </div>

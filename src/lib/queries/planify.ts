@@ -19,11 +19,11 @@ export type AgentStatus = 'idle' | 'queued' | 'running' | 'complete' | 'failed';
 export interface PlanifyProject {
   id: string;
   name: string;
-  siteAddress: string;
+  address: string;
   eircode?: string;
-  councilArea: string;
+  councilId: string;
   developmentType: string;
-  developmentDescription: string;
+  description: string;
   siteAreaSqm?: number;
   numberOfUnits?: number;
   status: ProjectStatus;
@@ -79,12 +79,12 @@ export interface ProjectStatusResponse {
 }
 
 export interface CreateProjectInput {
-  name?: string;
-  siteAddress: string;
+  name: string;
+  address: string;
   eircode?: string;
-  councilArea: string;
+  councilId: string;
   developmentType: string;
-  developmentDescription: string;
+  description: string;
   siteAreaSqm?: number;
   numberOfUnits?: number;
 }
