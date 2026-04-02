@@ -186,17 +186,28 @@ export function ApplicationPackage({
                             size="sm"
                             variant="outline"
                             className="gap-1.5"
-                            asChild
+                            onClick={async () => {
+                              try {
+                                const { apiClient } = await import('@/lib/api/client');
+                                const response = await apiClient.get(
+                                  `/planify/documents/${doc.id}/download`,
+                                  { responseType: 'blob' },
+                                );
+                                const url = window.URL.createObjectURL(new Blob([response.data]));
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `${doc.name.replace(/\s+/g, '-').toLowerCase()}.docx`;
+                                document.body.appendChild(a);
+                                a.click();
+                                window.URL.revokeObjectURL(url);
+                                a.remove();
+                              } catch (err) {
+                                console.error('Download failed:', err);
+                              }
+                            }}
                           >
-                            <a
-                              href={doc.downloadUrl}
-                              download
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <Download className="h-3.5 w-3.5" />
-                              Download
-                            </a>
+                            <Download className="h-3.5 w-3.5" />
+                            Download
                           </Button>
                         ) : rowStatus === 'running' ? (
                           <span className="text-xs text-amber-600">Generating...</span>
