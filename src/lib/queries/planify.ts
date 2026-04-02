@@ -114,7 +114,66 @@ async function fetchProject(id: string): Promise<PlanifyProject> {
 
 async function fetchProjectStatus(id: string): Promise<ProjectStatusResponse> {
   const { data } = await apiClient.get(`${PLANIFY_BASE}/projects/${id}/status`);
-  return data?.data ?? data;
+  const raw = data?.data ?? data;
+
+  // Transform backend flat agentRuns/documents into the structured shape the UI expects
+  const agentRuns: Array<{ agentType: string; status: string; startedAt?: string; completedAt?: string; outputJson?: any; errorMessage?: string }> = raw.agentRuns ?? [];
+  const documents: Array<{ id: string; documentType: string; status: string; fileUrl?: string; warningMessage?: string }> = raw.documents ?? [];
+
+  const researchRun = agentRuns.find((r) => r.agentType === 'research');
+  const documentRun = agentRuns.find((r) => r.agentType === 'document');
+
+  return {
+    projectId: raw.id,
+    status: raw.status,
+    researchAgent: {
+      status: researchRun?.status === 'complete' ? 'complete'
+        : researchRun?.status === 'running' ? 'running'
+        : researchRun?.status === 'failed' ? 'failed'
+        : researchRun?.status === 'queued' ? 'queued'
+        : 'idle',
+      startedAt: researchRun?.startedAt,
+      completedAt: researchRun?.completedAt,
+      error: researchRun?.errorMessage,
+      output: researchRun?.outputJson ? {
+        requirements: (researchRun.outputJson.requirements ?? []).map((r: any) => ({
+          id: r.document ?? r.id ?? '',
+          name: r.document ?? r.name ?? '',
+          category: r.planifyGenerates ? 'generated' : 'user_provides',
+          description: r.notes,
+          isGenerated: r.planifyGenerates ?? false,
+        })),
+        applicationFee: researchRun.outputJson.fees?.applicationFee,
+        estimatedTimeline: researchRun.outputJson.estimatedTimelineWeeks
+          ? `${researchRun.outputJson.estimatedTimelineWeeks.min}-${researchRun.outputJson.estimatedTimelineWeeks.max} weeks`
+          : undefined,
+        keyPolicies: (researchRun.outputJson.relevantPolicies ?? []).map((p: any) => ({
+          name: p.title,
+          reference: p.policyRef,
+        })),
+        councilNotes: researchRun.outputJson.fees?.notes,
+      } : undefined,
+    },
+    documentAgent: {
+      status: documentRun?.status === 'complete' ? 'complete'
+        : documentRun?.status === 'running' ? 'running'
+        : documentRun?.status === 'failed' ? 'failed'
+        : documentRun?.status === 'queued' ? 'queued'
+        : 'idle',
+      startedAt: documentRun?.startedAt,
+      completedAt: documentRun?.completedAt,
+      error: documentRun?.errorMessage,
+      documents: documents.map((d) => ({
+        id: d.id,
+        name: d.documentType.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+        status: d.status === 'complete' ? 'complete' as const
+          : d.status === 'generating' ? 'running' as const
+          : 'failed' as const,
+        downloadUrl: d.fileUrl,
+        error: d.warningMessage,
+      })),
+    },
+  };
 }
 
 async function createProject(input: CreateProjectInput): Promise<PlanifyProject> {
