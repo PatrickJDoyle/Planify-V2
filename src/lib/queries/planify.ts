@@ -100,7 +100,7 @@ export const planifyKeys = {
 
 // ─── API Functions ───────────────────────────────────────────────────────────
 
-const PLANIFY_BASE = '/api/planify';
+const PLANIFY_BASE = '/planify';
 
 async function fetchProjects(): Promise<PlanifyProject[]> {
   const { data } = await apiClient.get(`${PLANIFY_BASE}/projects`);
