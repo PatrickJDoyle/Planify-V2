@@ -203,6 +203,7 @@ export function ApplicationPackage({
                                 a.remove();
                               } catch (err) {
                                 console.error('Download failed:', err);
+                                alert('Download failed. The document may need to be regenerated.');
                               }
                             }}
                           >
