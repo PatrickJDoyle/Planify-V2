@@ -41,15 +41,6 @@ const CONFIDENCE_LABELS: Record<string, string> = {
   low: 'Low confidence',
 };
 
-/** Maps UI label → API `development_type` slug (must stay aligned with Qdrant `development_types` payloads). */
-function developmentTypeSlugFromLabel(label: string): string {
-  return label
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '')
-    .trim()
-    .replace(/\s+/g, '_');
-}
-
 interface SnapshotWidgetProps {
   /** When true, renders in a compact card frame suitable for embedding */
   embedded?: boolean;
