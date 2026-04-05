@@ -50,6 +50,21 @@ const TERMINAL_JOB_STATUSES: ReportJobStatus[] = ['generated', 'failed', 'cancel
 const DEFAULT_POLL_MS = 2000;
 const DEFAULT_MAX_WAIT_MS = 10 * 60 * 1000;
 
+function delayMs(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'));
+      return;
+    }
+    const id = setTimeout(resolve, ms);
+    const onAbort = () => {
+      clearTimeout(id);
+      reject(new DOMException('Aborted', 'AbortError'));
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
 export const reportJobsApi = {
   createPrePlanningJob: async (payload: PrePlanningGeneratePayload) => {
     const { data } = await apiClient.post<{ status: ReportJobStatus; jobId: number }>(
@@ -98,7 +113,7 @@ export async function waitForPrePlanningJob(
       }
       return job;
     }
-    await new Promise((r) => setTimeout(r, pollMs));
+    await delayMs(pollMs, options?.signal);
   }
 
   throw new Error(

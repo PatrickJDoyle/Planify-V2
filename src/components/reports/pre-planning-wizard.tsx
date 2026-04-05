@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   MapPin,
   Ruler,
@@ -72,6 +73,33 @@ const INTENTION_CATEGORIES = [
 
 const RADIUS_OPTIONS = [100, 250, 500, 1000, 2000];
 
+function stripHtmlToPlainText(html: string): string {
+  if (typeof window === 'undefined') return html;
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  return doc.body?.textContent?.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim() ?? '';
+}
+
+async function copyPlainTextFromHtml(html: string): Promise<void> {
+  const text = stripHtmlToPlainText(html);
+  if (!text) throw new Error('Nothing to copy.');
+  try {
+    await navigator.clipboard.writeText(text);
+    return;
+  } catch {
+    /* fall through */
+  }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  const ok = document.execCommand('copy');
+  document.body.removeChild(ta);
+  if (!ok) throw new Error('Copy failed. Try Export instead.');
+}
+
 interface WizardState {
   address: string;
   latitude: number | null;
@@ -102,6 +130,8 @@ function StepDots({ total, current }: { total: number; current: number }) {
 }
 
 export function PrePlanningReportWizard({ open, onOpenChange, initialJobId = null }: ReportWizardProps) {
+  const router = useRouter();
+  const pollAbortRef = useRef<AbortController | null>(null);
   const [step, setStep] = useState<Step>('location');
   const [state, setState] = useState<WizardState>({
     address: '',
@@ -117,6 +147,9 @@ export function PrePlanningReportWizard({ open, onOpenChange, initialJobId = nul
   const [reportContent, setReportContent] = useState<string>('');
   const [existingJobError, setExistingJobError] = useState('');
   const [isExistingJobLoading, setIsExistingJobLoading] = useState(false);
+  const [generateError, setGenerateError] = useState('');
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle');
+  const [completedJobId, setCompletedJobId] = useState<number | null>(null);
 
   const { data: optimalRadius, isLoading: loadingRadius } = useOptimalRadius(
     state.latitude,
@@ -135,42 +168,54 @@ export function PrePlanningReportWizard({ open, onOpenChange, initialJobId = nul
     setGeocodeError('');
     setExistingJobError('');
     setIsExistingJobLoading(false);
+    setGenerateError('');
+    setCopyStatus('idle');
+    setCompletedJobId(null);
   };
 
-  const handleClose = () => {
-    reset();
-    onOpenChange(false);
+  const handleDialogOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      pollAbortRef.current?.abort();
+      pollAbortRef.current = null;
+      runReportJob.reset();
+      reset();
+    }
+    onOpenChange(nextOpen);
   };
 
   useEffect(() => {
     if (!open || initialJobId == null) return;
 
-    let cancelled = false;
+    pollAbortRef.current?.abort();
+    const ac = new AbortController();
+    pollAbortRef.current = ac;
+
     setStep('generating');
     setReportContent('');
     setExistingJobError('');
+    setGenerateError('');
     setIsExistingJobLoading(true);
 
     void (async () => {
       try {
-        const job = await waitForPrePlanningJob(initialJobId);
-        if (cancelled) return;
+        const job = await waitForPrePlanningJob(initialJobId, { signal: ac.signal });
         const html = job.combinedHtml ?? job.narrativeHtml ?? '';
         if (!html.trim()) {
           setExistingJobError('This report has no saved content yet.');
           return;
         }
         setReportContent(html);
+        setCompletedJobId(initialJobId);
       } catch (e) {
-        if (cancelled) return;
+        if (e instanceof DOMException && e.name === 'AbortError') return;
         setExistingJobError(e instanceof Error ? e.message : 'Failed to load report.');
       } finally {
-        if (!cancelled) setIsExistingJobLoading(false);
+        if (!ac.signal.aborted) setIsExistingJobLoading(false);
       }
     })();
 
     return () => {
-      cancelled = true;
+      ac.abort();
     };
   }, [open, initialJobId]);
 
@@ -199,7 +244,14 @@ export function PrePlanningReportWizard({ open, onOpenChange, initialJobId = nul
   };
 
   const handleGenerate = async () => {
+    setGenerateError('');
+    runReportJob.reset();
+    pollAbortRef.current?.abort();
+    const ac = new AbortController();
+    pollAbortRef.current = ac;
     setStep('generating');
+    setReportContent('');
+    setCompletedJobId(null);
     try {
       let applications = optimalRadius?.applications ?? [];
       const adjusted = optimalRadius?.adjustedRadius ?? state.radius;
@@ -224,8 +276,10 @@ export function PrePlanningReportWizard({ open, onOpenChange, initialJobId = nul
         centreLon: state.longitude ?? undefined,
         intentionCategory: state.intentionCategory,
         intentionSubCategory: state.intentionSubCategory,
+        pollSignal: ac.signal,
       });
       setReportContent(result.content);
+      setCompletedJobId(result.jobId);
       markPostReportSession();
       const initialCount = optimalRadius?.initialCount ?? 0;
       captureDemoEvent(DEMO_EVENT.DEMO_REPORT_GENERATED, {
@@ -235,15 +289,17 @@ export function PrePlanningReportWizard({ open, onOpenChange, initialJobId = nul
         has_zoning_context: false,
         initial_vs_adjusted_radius: `${state.radius}:${optimalRadius?.adjustedRadius ?? state.radius}`,
       });
-    } catch {
-      setStep('intention');
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return;
+      setGenerateError(e instanceof Error ? e.message : 'Something went wrong.');
     }
   };
 
   const category = INTENTION_CATEGORIES.find((c) => c.id === selectedCategory);
+  const activeJobId = completedJobId ?? initialJobId;
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <div className="mb-3 flex items-center justify-between">
@@ -431,9 +487,31 @@ export function PrePlanningReportWizard({ open, onOpenChange, initialJobId = nul
                   <AlertCircle className="h-7 w-7 text-destructive" />
                 </div>
                 <p className="max-w-sm text-center text-sm text-destructive">{existingJobError}</p>
-                <Button variant="outline" size="sm" onClick={handleClose}>
+                <Button variant="outline" size="sm" onClick={() => handleDialogOpenChange(false)}>
                   Close
                 </Button>
+              </>
+            ) : generateError ? (
+              <>
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-destructive/10">
+                  <AlertCircle className="h-7 w-7 text-destructive" />
+                </div>
+                <p className="max-w-sm text-center text-sm text-destructive">{generateError}</p>
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setGenerateError('');
+                      setStep('intention');
+                    }}
+                  >
+                    Adjust inputs
+                  </Button>
+                  <Button size="sm" className="bg-brand-500 hover:bg-brand-600" onClick={() => void handleGenerate()}>
+                    Try again
+                  </Button>
+                </div>
               </>
             ) : runReportJob.isPending || isExistingJobLoading ? (
               <>
@@ -473,11 +551,13 @@ export function PrePlanningReportWizard({ open, onOpenChange, initialJobId = nul
                     size="sm"
                     className="gap-2"
                     onClick={async () => {
+                      setCopyStatus('idle');
                       try {
-                        await navigator.clipboard.writeText(reportContent);
-                        captureDemoEvent(DEMO_EVENT.REPORT_EXPORTED, { format: 'clipboard_markdown' });
+                        await copyPlainTextFromHtml(reportContent);
+                        setCopyStatus('copied');
+                        captureDemoEvent(DEMO_EVENT.REPORT_EXPORTED, { format: 'clipboard_plaintext' });
                       } catch {
-                        /* ignore */
+                        setCopyStatus('error');
                       }
                     }}
                   >
@@ -485,13 +565,49 @@ export function PrePlanningReportWizard({ open, onOpenChange, initialJobId = nul
                     Copy report
                   </Button>
                   <Button
-                    className="gap-2 bg-brand-500 hover:bg-brand-600"
-                    onClick={handleClose}
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    disabled={activeJobId == null}
+                    onClick={() => {
+                      if (activeJobId == null) return;
+                      const doc = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/><title>Pre-planning report</title></head><body>${reportContent}</body></html>`;
+                      const blob = new Blob([doc], { type: 'text/html;charset=utf-8' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `pre-planning-report-${activeJobId}.html`;
+                      a.rel = 'noopener';
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      URL.revokeObjectURL(url);
+                      captureDemoEvent(DEMO_EVENT.REPORT_EXPORTED, { format: 'download_html' });
+                    }}
                   >
                     <FileText className="h-4 w-4" />
-                    View Report
+                    Export HTML
+                  </Button>
+                  <Button
+                    className="gap-2 bg-brand-500 hover:bg-brand-600"
+                    disabled={activeJobId == null}
+                    onClick={() => {
+                      if (activeJobId == null) return;
+                      router.replace(`/reports/pre-planning?jobId=${activeJobId}`);
+                    }}
+                  >
+                    <FileText className="h-4 w-4" />
+                    View report
                   </Button>
                 </div>
+                {copyStatus === 'copied' && (
+                  <p className="text-center text-xs text-status-granted">Copied to clipboard</p>
+                )}
+                {copyStatus === 'error' && (
+                  <p className="max-w-sm text-center text-xs text-destructive">
+                    Could not copy. Use Export HTML or open View report in a new tab from your browser.
+                  </p>
+                )}
               </>
             ) : null}
           </div>
@@ -503,7 +619,11 @@ export function PrePlanningReportWizard({ open, onOpenChange, initialJobId = nul
             <Button
               variant="ghost"
               size="sm"
-              onClick={currentIdx === 0 ? handleClose : () => setStep(STEPS[currentIdx - 1]!)}
+              onClick={
+                currentIdx === 0
+                  ? () => handleDialogOpenChange(false)
+                  : () => setStep(STEPS[currentIdx - 1]!)
+              }
               className="gap-1.5 text-foreground-muted"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
