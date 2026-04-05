@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   MapPin,
   Ruler,
@@ -24,7 +24,9 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import { useOptimalRadius, useGeneratePrePlanningReport } from '@/lib/queries/reports';
+import { useOptimalRadius, useRunPrePlanningReportJob } from '@/lib/queries/reports';
+import { reportsApi } from '@/lib/api/reports';
+import { waitForPrePlanningJob } from '@/lib/api/report-jobs';
 import {
   applicationCountBand,
   captureDemoEvent,
@@ -39,6 +41,8 @@ import {
 interface ReportWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** When set (e.g. from `/reports/pre-planning?jobId=`), load that saved job instead of running the wizard flow. */
+  initialJobId?: number | null;
 }
 
 type Step = 'location' | 'radius' | 'intention' | 'generating';
@@ -97,7 +101,7 @@ function StepDots({ total, current }: { total: number; current: number }) {
   );
 }
 
-export function PrePlanningReportWizard({ open, onOpenChange }: ReportWizardProps) {
+export function PrePlanningReportWizard({ open, onOpenChange, initialJobId = null }: ReportWizardProps) {
   const [step, setStep] = useState<Step>('location');
   const [state, setState] = useState<WizardState>({
     address: '',
@@ -111,12 +115,14 @@ export function PrePlanningReportWizard({ open, onOpenChange }: ReportWizardProp
   const [geocoding, setGeocoding] = useState(false);
   const [geocodeError, setGeocodeError] = useState('');
   const [reportContent, setReportContent] = useState<string>('');
+  const [existingJobError, setExistingJobError] = useState('');
+  const [isExistingJobLoading, setIsExistingJobLoading] = useState(false);
 
   const { data: optimalRadius, isLoading: loadingRadius } = useOptimalRadius(
     state.latitude,
     state.longitude,
   );
-  const generateReport = useGeneratePrePlanningReport();
+  const runReportJob = useRunPrePlanningReportJob();
 
   const STEPS: Step[] = ['location', 'radius', 'intention', 'generating'];
   const currentIdx = STEPS.indexOf(step);
@@ -127,12 +133,46 @@ export function PrePlanningReportWizard({ open, onOpenChange }: ReportWizardProp
     setSelectedCategory('');
     setReportContent('');
     setGeocodeError('');
+    setExistingJobError('');
+    setIsExistingJobLoading(false);
   };
 
   const handleClose = () => {
     reset();
     onOpenChange(false);
   };
+
+  useEffect(() => {
+    if (!open || initialJobId == null) return;
+
+    let cancelled = false;
+    setStep('generating');
+    setReportContent('');
+    setExistingJobError('');
+    setIsExistingJobLoading(true);
+
+    void (async () => {
+      try {
+        const job = await waitForPrePlanningJob(initialJobId);
+        if (cancelled) return;
+        const html = job.combinedHtml ?? job.narrativeHtml ?? '';
+        if (!html.trim()) {
+          setExistingJobError('This report has no saved content yet.');
+          return;
+        }
+        setReportContent(html);
+      } catch (e) {
+        if (cancelled) return;
+        setExistingJobError(e instanceof Error ? e.message : 'Failed to load report.');
+      } finally {
+        if (!cancelled) setIsExistingJobLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, initialJobId]);
 
   // Geocode address using browser's Geocoder API (or just use what user enters)
   const handleGeocode = async () => {
@@ -161,10 +201,23 @@ export function PrePlanningReportWizard({ open, onOpenChange }: ReportWizardProp
   const handleGenerate = async () => {
     setStep('generating');
     try {
-      const result = await generateReport.mutateAsync({
-        applications: [],
+      let applications = optimalRadius?.applications ?? [];
+      const adjusted = optimalRadius?.adjustedRadius ?? state.radius;
+      if (
+        applications.length === 0 &&
+        state.latitude != null &&
+        state.longitude != null
+      ) {
+        applications = await reportsApi.getNearbyApplications({
+          latitude: state.latitude,
+          longitude: state.longitude,
+          radius: adjusted,
+        });
+      }
+      const result = await runReportJob.mutateAsync({
+        applications,
         initialRadius: state.radius,
-        adjustedRadius: optimalRadius?.adjustedRadius ?? state.radius,
+        adjustedRadius: adjusted,
         initialApplicationCount: optimalRadius?.initialCount ?? 0,
         address: state.address,
         centreLat: state.latitude ?? undefined,
@@ -372,16 +425,32 @@ export function PrePlanningReportWizard({ open, onOpenChange }: ReportWizardProp
         {/* Step: Generating */}
         {step === 'generating' && (
           <div className="flex flex-col items-center gap-4 py-6">
-            {generateReport.isPending ? (
+            {existingJobError ? (
+              <>
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-destructive/10">
+                  <AlertCircle className="h-7 w-7 text-destructive" />
+                </div>
+                <p className="max-w-sm text-center text-sm text-destructive">{existingJobError}</p>
+                <Button variant="outline" size="sm" onClick={handleClose}>
+                  Close
+                </Button>
+              </>
+            ) : runReportJob.isPending || isExistingJobLoading ? (
               <>
                 <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-500/10">
                   <Loader2 className="h-7 w-7 animate-spin text-brand-500" />
                 </div>
                 <div className="text-center">
-                  <p className="font-medium text-foreground">Analysing {state.address}</p>
-                  <p className="mt-1 text-sm text-foreground-muted">
-                    Scanning {optimalRadius?.initialCount ?? '—'} nearby planning applications…
+                  <p className="font-medium text-foreground">
+                    {initialJobId != null ? 'Loading your report…' : `Analysing ${state.address}`}
                   </p>
+                  {initialJobId == null ? (
+                    <p className="mt-1 text-sm text-foreground-muted">
+                      Scanning {optimalRadius?.initialCount ?? '—'} nearby planning applications…
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-sm text-foreground-muted">Fetching saved report from your history…</p>
+                  )}
                 </div>
               </>
             ) : reportContent ? (

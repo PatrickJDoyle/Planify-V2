@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   FileText,
   Plus,
@@ -34,16 +35,36 @@ const FEATURE_CARDS = [
   },
 ];
 
-export default function PrePlanningReportPage() {
+function PrePlanningReportPageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const jobIdRaw = searchParams.get('jobId');
+  const initialJobId =
+    jobIdRaw != null && /^\d+$/.test(jobIdRaw) ? Number.parseInt(jobIdRaw, 10) : null;
+
   const [wizardOpen, setWizardOpen] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
   const { limits, isPaid } = useUserProfile();
+
+  useEffect(() => {
+    if (initialJobId != null) {
+      setWizardOpen(true);
+    }
+  }, [initialJobId]);
+
+  const handleWizardOpenChange = (open: boolean) => {
+    setWizardOpen(open);
+    if (!open) {
+      router.replace('/reports/pre-planning');
+    }
+  };
 
   const handleCreate = () => {
     if (!isPaid || !limits.canUsePrePlanning) {
       setPaywallOpen(true);
       return;
     }
+    router.replace('/reports/pre-planning');
     setWizardOpen(true);
   };
 
@@ -97,7 +118,11 @@ export default function PrePlanningReportPage() {
         </p>
       </div>
 
-      <PrePlanningReportWizard open={wizardOpen} onOpenChange={setWizardOpen} />
+      <PrePlanningReportWizard
+        open={wizardOpen}
+        onOpenChange={handleWizardOpenChange}
+        initialJobId={initialJobId}
+      />
       <PaywallModal
         open={paywallOpen}
         onOpenChange={setPaywallOpen}
@@ -105,5 +130,17 @@ export default function PrePlanningReportPage() {
         description="Pre-planning intelligence reports are available on Personal and Enterprise plans."
       />
     </>
+  );
+}
+
+export default function PrePlanningReportPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto max-w-3xl p-6 text-sm text-foreground-muted">Loading…</div>
+      }
+    >
+      <PrePlanningReportPageInner />
+    </Suspense>
   );
 }

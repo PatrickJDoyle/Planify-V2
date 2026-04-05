@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { reportsApi } from '@/lib/api/reports';
+import { reportJobsApi, waitForPrePlanningJob } from '@/lib/api/report-jobs';
 import type { PrePlanningGeneratePayload } from '@/lib/types/phase5';
 import { queryKeys } from './keys';
 
@@ -45,5 +46,17 @@ export function useComputePrePlanningStats() {
 export function useGeneratePrePlanningReport() {
   return useMutation({
     mutationFn: (payload: PrePlanningGeneratePayload) => reportsApi.generate(payload),
+  });
+}
+
+/** Creates a persistent report job and polls until HTML is available (same rows as Report History). */
+export function useRunPrePlanningReportJob() {
+  return useMutation({
+    mutationFn: async (payload: PrePlanningGeneratePayload) => {
+      const { jobId } = await reportJobsApi.createPrePlanningJob(payload);
+      const job = await waitForPrePlanningJob(jobId);
+      const content = job.combinedHtml ?? job.narrativeHtml ?? '';
+      return { content, jobId };
+    },
   });
 }
