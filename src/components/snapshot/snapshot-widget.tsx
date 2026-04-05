@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   MapPin,
   Loader2,
@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { postSnapshot } from '@/lib/api/snapshot';
 import type { SnapshotResult, SnapshotRateLimitError, SnapshotValidationError } from '@/lib/types/snapshot';
-import { PLANNING_INTENTIONS } from '@/lib/constants/planning-intentions';
+import { PLANNING_INTENTIONS, planningIntentionApiValue } from '@/lib/constants/planning-intentions';
 
 type WidgetState =
   | { kind: 'idle' }
@@ -41,6 +41,15 @@ const CONFIDENCE_LABELS: Record<string, string> = {
   low: 'Low confidence',
 };
 
+/** Maps UI label → API `development_type` slug (must stay aligned with Qdrant `development_types` payloads). */
+function developmentTypeSlugFromLabel(label: string): string {
+  return label
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .trim()
+    .replace(/\s+/g, '_');
+}
+
 interface SnapshotWidgetProps {
   /** When true, renders in a compact card frame suitable for embedding */
   embedded?: boolean;
@@ -51,28 +60,34 @@ export function SnapshotWidget({ embedded = false, className }: SnapshotWidgetPr
   const [address, setAddress] = useState('');
   const [developmentType, setDevelopmentType] = useState('');
   const [state, setState] = useState<WidgetState>({ kind: 'idle' });
+  const submitInFlight = useRef(false);
 
   const canSubmit = address.trim().length > 0 && developmentType.length > 0;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!canSubmit) return;
+    if (!canSubmit || submitInFlight.current) return;
 
+    submitInFlight.current = true;
     setState({ kind: 'loading' });
-    const result = await postSnapshot({ address: address.trim(), development_type: developmentType });
-
-    if (result.kind === 'result') {
-      setState({ kind: 'result', data: result.data });
-    } else if (result.kind === 'rate_limited') {
-      setState({ kind: 'rate_limited', data: result.data });
-    } else if (result.kind === 'validation_error') {
-      setState({ kind: 'validation_error', data: result.data });
-    } else {
-      setState({ kind: 'error', message: result.message });
+    try {
+      const result = await postSnapshot({ address: address.trim(), development_type: developmentType });
+      if (result.kind === 'result') {
+        setState({ kind: 'result', data: result.data });
+      } else if (result.kind === 'rate_limited') {
+        setState({ kind: 'rate_limited', data: result.data });
+      } else if (result.kind === 'validation_error') {
+        setState({ kind: 'validation_error', data: result.data });
+      } else {
+        setState({ kind: 'error', message: result.message });
+      }
+    } finally {
+      submitInFlight.current = false;
     }
   }
 
   function handleReset() {
+    submitInFlight.current = false;
     setState({ kind: 'idle' });
     setAddress('');
     setDevelopmentType('');
@@ -130,11 +145,7 @@ export function SnapshotWidget({ embedded = false, className }: SnapshotWidgetPr
                 {PLANNING_INTENTIONS.map((cat) => (
                   <optgroup key={cat.category} label={cat.category}>
                     {cat.subCategories.map((sub) => {
-                      const value = sub
-                        .toLowerCase()
-                        .replace(/[^a-z0-9\s]/g, '')
-                        .trim()
-                        .replace(/\s+/g, '_');
+                      const value = planningIntentionApiValue(cat.category, sub);
                       return (
                         <option key={value} value={value}>
                           {sub}
@@ -230,9 +241,9 @@ export function SnapshotWidget({ embedded = false, className }: SnapshotWidgetPr
                   Relevant planning policies
                 </div>
                 <ul className="space-y-2">
-                  {state.data.policies.map((policy) => (
+                  {state.data.policies.map((policy, policyIndex) => (
                     <li
-                      key={policy.reference}
+                      key={`${policy.reference}-${policyIndex}-${policy.title.slice(0, 24)}`}
                       className="rounded-lg border border-border bg-background-subtle px-4 py-3"
                     >
                       <div className="flex items-center justify-between gap-2">

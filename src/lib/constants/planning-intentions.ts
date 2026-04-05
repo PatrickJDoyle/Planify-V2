@@ -3,6 +3,24 @@ export interface PlanningIntention {
   subCategories: string[];
 }
 
+/** Lowercase slug for planning labels (matches historical widget/session behaviour). */
+function slugifyPlanningLabel(label: string): string {
+  return label
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .trim()
+    .replace(/\s+/g, '_');
+}
+
+/**
+ * Stable, unique API value per (category, subCategory).
+ * Disambiguates collisions (e.g. "Pub / restaurant" vs "Pub -> restaurant" both slugify to `pub_restaurant`).
+ * Snapshot service treats the substring after the last `__` as the coarse Qdrant / precedent key.
+ */
+export function planningIntentionApiValue(category: string, subCategory: string): string {
+  return `${slugifyPlanningLabel(category)}__${slugifyPlanningLabel(subCategory)}`;
+}
+
 export const PLANNING_INTENTIONS: PlanningIntention[] = [
   {
     category: 'New Development / New Buildings',
@@ -93,7 +111,7 @@ export const PLANNING_INTENTIONS: PlanningIntention[] = [
       'Shop -> medical clinic',
       'Shop -> offices',
       'Office -> residential',
-      'Pub -> restaurant',
+      'Pub conversion to restaurant',
       'Restaurant -> takeaway',
       'Retail -> warehouse',
       'Factory -> storage',
