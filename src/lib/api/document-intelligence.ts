@@ -82,7 +82,7 @@ function getAuthHeaders(tokenOverride?: string): Record<string, string> {
 
 function absoluteImageUrl(url: string): string {
   if (!url.startsWith('/')) return url;
-  const base = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'https://backend-api.plannify.org';
+  const base = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'https://backend-api.planify.ie';
   return `${base}${url}`;
 }
 
@@ -125,7 +125,7 @@ export const documentIntelligenceApi = {
     },
     signal?: AbortSignal,
   ): Promise<void> => {
-    const base = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'https://backend-api.plannify.org';
+    const base = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'https://backend-api.planify.ie';
     const query = new URLSearchParams({
       applicationNumber: params.applicationNumber,
       maxDocuments: String(params.maxDocuments ?? 50),

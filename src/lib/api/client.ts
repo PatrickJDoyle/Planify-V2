@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 export const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_BACKEND_API_URL || 'https://backend-api.plannify.org',
+  baseURL: process.env.NEXT_PUBLIC_BACKEND_API_URL || 'https://backend-api.planify.ie',
   headers: {
     'Content-Type': 'application/json',
   },

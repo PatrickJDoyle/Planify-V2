@@ -43,7 +43,7 @@ const DRAWING_TYPE_LABELS: Record<string, string> = {
 
 function absoluteMaybe(url: string): string {
   if (!url.startsWith('/')) return url;
-  const base = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'https://backend-api.plannify.org';
+  const base = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'https://backend-api.planify.ie';
   return `${base}${url}`;
 }
 
