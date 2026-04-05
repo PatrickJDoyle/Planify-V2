@@ -11,6 +11,8 @@ import { formatAddress, formatDescription } from '@/lib/utils/formatting';
 import { formatDate } from '@/lib/utils/dates';
 import type { Application } from '@/lib/types/application';
 import type { ZoningData } from '@/lib/api/zoning';
+import { captureDemoEvent, DEMO_EVENT } from '@/lib/analytics/demo-analytics';
+import { DEMO_SOURCE_TRUST_PANEL, DEMO_ZONING_UNAVAILABLE } from '@/lib/demo-trust-copy';
 
 interface ApplicationHeaderProps {
   application: Application;
@@ -31,6 +33,7 @@ export function ApplicationHeader({ application: app, zoning }: ApplicationHeade
     } else {
       await navigator.clipboard.writeText(url);
     }
+    captureDemoEvent(DEMO_EVENT.REPORT_EXPORTED, { format: 'share_link' });
   };
 
   return (
@@ -90,6 +93,11 @@ export function ApplicationHeader({ application: app, zoning }: ApplicationHeade
               Zone: {zoning.zoneGzt}
             </span>
           )}
+          {!zoning && (
+            <span className="rounded-md border border-border bg-background-muted px-2 py-0.5 text-[11px] text-foreground-muted">
+              {DEMO_ZONING_UNAVAILABLE}
+            </span>
+          )}
         </div>
 
         <div className="mt-2 flex items-start justify-between gap-4">
@@ -130,6 +138,10 @@ export function ApplicationHeader({ application: app, zoning }: ApplicationHeade
             ))}
           </div>
         )}
+
+        <p className="mt-3 max-w-3xl rounded-md border border-border bg-background-subtle px-3 py-2 text-[11px] leading-snug text-foreground-muted">
+          {DEMO_SOURCE_TRUST_PANEL}
+        </p>
       </div>
     </div>
   );

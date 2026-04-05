@@ -1,100 +1,43 @@
-# Planify V2 — Frontend Engineer (agent instructions)
+# Planify V2 — agent instructions (hub)
 
-This file is the **source of truth** for how the senior frontend engineer (human or AI) owns the **Planify-V2** Next.js application. It complements repo-level [`../STATE.md`](../STATE.md) and [`../VISION.md`](../VISION.md) on the Planify desktop root.
+This repo uses a **small hub + per-role instructions**. Canonical **path ownership**, **compliance lanes**, and **reviewer defaults** live in [`docs/OWNERSHIP_MATRIX.md`](docs/OWNERSHIP_MATRIX.md).
 
-## Mission
+## Role-specific AGENTS.md
 
-Ship a **trustworthy enterprise UX** for pre-planning and permit-adjacent workflows: correct data handling, clear compliance-sensitive surfaces, and performance that holds up on real council-scale datasets. Prefer boring, reviewable patterns over clever one-offs.
+| Role | Document |
+|------|----------|
+| Staff Engineer | [`agents/staff-engineer/AGENTS.md`](agents/staff-engineer/AGENTS.md) |
+| Release Engineer | [`agents/release-engineer/AGENTS.md`](agents/release-engineer/AGENTS.md) |
+| Frontend Engineer | [`agents/frontend-engineer/AGENTS.md`](agents/frontend-engineer/AGENTS.md) |
+| Designer | [`agents/designer/AGENTS.md`](agents/designer/AGENTS.md) |
+| QA Engineer | [`agents/qa-engineer/AGENTS.md`](agents/qa-engineer/AGENTS.md) |
+| Compliance Engineer | [`agents/compliance-engineer/AGENTS.md`](agents/compliance-engineer/AGENTS.md) |
 
-## Stack (know it cold)
+Index: [`agents/README.md`](agents/README.md).
 
-- **Framework:** Next.js 14 (App Router), React 18, TypeScript
-- **UI:** Tailwind, Radix primitives, shadcn-style components under `src/components/ui`
-- **Data:** TanStack Query (`src/lib/queries/*`), axios client (`src/lib/api/client.ts`)
-- **Auth:** Clerk (`@clerk/nextjs`); token + user id synced to `localStorage` for `apiClient` in `(auth)/layout.tsx`
-- **Maps / geo:** `@react-google-maps/api`, Mapbox, deck.gl (see `src/components/map3d`, `src/lib/maps`)
-- **Forms:** react-hook-form + zod
-- **Client state:** Zustand stores in `src/lib/stores`
-- **Billing:** Stripe.js + paywall flows under `src/components/billing`
-- **E2E:** Playwright (`e2e/`, `playwright.config.ts`)
+## PR routing (all roles)
 
-## Primary ownership (you are DRI)
+1. Mark every PR with **`Compliance: yes`** or **`Compliance: no`** (definitions in the matrix).
+2. Optional labels: **`compliance`**, **`needs-staff`** (see matrix).
 
-End-to-end responsibility for everything under **`Planify-V2-main/src/`** unless explicitly escalated:
+## Compliance lane owner
 
-| Domain | Typical paths | Notes |
-|--------|----------------|-------|
-| App routes & layouts | `src/app/**` | `(auth)`, `(public)`, `(embed)` groups — respect server vs client boundaries |
-| API surface to backend | `src/lib/api/**` | Thin typed wrappers; keep shapes aligned with backend DTOs |
-| Server/client data hooks | `src/lib/queries/**` | Query keys in `queries/keys.ts`; invalidate on mutations |
-| Shared types | `src/lib/types/**` | When backend types change, coordinate a single update PR |
-| Feature UI | `src/components/dashboard`, `application`, `reports`, `alerts`, `planify`, `snapshot`, etc. | Compose from `components/ui` and shared patterns |
-| Maps & spatial UX | `src/components/map3d`, map sections on application/dashboard | Performance and API keys (`NEXT_PUBLIC_*`) |
-| Billing & gating | `src/components/billing` | UX + integration; pricing rules may need product/legal input |
-| Embed / widget | `src/app/(embed)`, `public/snapshot-embed.js` | Third-party embedding — extra care for CSP and versioning |
-| Middleware & auth glue | `src/middleware.ts`, auth layout | Do not weaken auth for convenience |
+**Compliance & data integrity** is owned by the **Compliance Engineer** (see matrix). **Staff Engineer** runs **pre-landing structural review** on branches ready to ship; that is separate from owning the compliance lane day-to-day.
 
-## Specialist strengths (default assignments)
+## Pre-landing review → release
 
-Use this list when planning work so **Staff Engineer** is not pulled in for routine frontend depth:
+After implementation, **Staff Engineer** runs structural pre-landing review (see [`agents/staff-engineer/AGENTS.md`](agents/staff-engineer/AGENTS.md)). When approved, **Release Engineer** owns shipping.
 
-1. **Application detail & documents** — timeline, BCMS, property, document intelligence panels; table-heavy layouts.
-2. **Dashboard & search** — filters, results grid/table, heatmap entry points, saved items.
-3. **Reports & pre-planning wizard** — multi-step flows, validation, progress persistence.
-4. **Alerts** — wizard + inbox patterns; empty states and status messaging.
-5. **Clerk + legacy API bridge** — `apiClient` interceptors, 401 handling, header contracts with backend.
-6. **Design system implementation** — Radix + Tailwind tokens; no ad-hoc inline theme sprawl.
+### Paperclip / multi-agent handoffs
 
-## Flex coverage (when to stretch outside the lane)
+Setting an issue to **`blocked` alone does not notify** the next owner. Always:
 
-- **Designer (UI/UX):** You implement specs and interaction polish; you propose component API changes when Figma cannot map 1:1 to existing primitives. Escalate **brand-new patterns** that need a new base component with the Designer first.
-- **Backend:** You own **client** contracts. If the API is wrong or ambiguous, open a **clear repro + expected JSON** for backend; do not paper over with silent coercion.
-- **QA:** You fix deterministic UI bugs and flaky selectors; you do not own full test strategy.
-- **Release:** You keep builds green (`next build`, `next lint`); coordinate breaking env changes (`NEXT_PUBLIC_*`).
+1. `PATCH` the issue status as appropriate.
+2. Post a comment that **@-mentions** the target agent, e.g. `[@Release Engineer](agent://58cfca27-adc3-470d-843f-8557d094e23f)` (use your company’s live agent URLs from the control plane).
 
-## Ownership proposal — reducing Staff Engineer context switching
-
-**Default rule:** Staff Engineer is **not** the first assignee for:
-
-- New or changed **pages and flows** in `src/app` that follow existing data-fetch patterns.
-- **React Query** cache keys, loading/error UI, and pagination.
-- **Component-level** refactors that do not change security boundaries or cross-repo contracts.
-- **Styling and layout** work inside established layouts.
-
-**Escalate to Staff Engineer** when:
-
-- Auth model, middleware, or token storage needs a **security review** or structural change.
-- A feature requires **new cross-cutting architecture** (e.g. global event bus, major state redesign spanning many routes).
-- **Backend and frontend types diverge** at scale — propose a shared package or codegen; Staff drives the contract.
-- Performance issues trace to **Next.js rendering model** (SSR/SSG/RSC boundaries) or bundle strategy, not a single slow component.
-
-**Backup:** When Frontend Engineer is unavailable, **CTO** triages; Staff Engineer covers **architectural** frontend decisions only, not day-to-day feature UI.
-
-## Upskilling sprint (concrete 10-day shape)
-
-Complete this once per major phase (or when onboarding a new frontend agent):
-
-1. Read **root** [`STATE.md`](../STATE.md), [`VISION.md`](../VISION.md), and `docs/CEO_PLAN_PERMITFLOW_V2.md` (if present) — align with current milestone.
-2. Trace **one vertical slice** end-to-end: route → query hook → `src/lib/api/*` → backend response → UI states (loading / empty / error).
-3. Inventory **env vars** required for local dev (`NEXT_PUBLIC_BACKEND_API_URL`, map keys, Clerk keys) and document gaps in a ticket rather than hard-coding.
-4. Run **`pnpm`/`npm` install**, `npm run lint`, `npm run build`; fix what breaks in touched areas.
-5. Skim **Playwright** `e2e/` for critical paths; extend specs when changing those flows.
-6. Update **this file** when ownership boundaries shift (e.g. new subdomain or major new feature area).
-
-## Implementation conventions
-
-- Prefer **`@/` imports** as configured in `tsconfig`.
-- New fetch logic: **API function in `src/lib/api`** + **hook in `src/lib/queries`** + **types in `src/lib/types`**.
-- Use **existing** `components/ui/*` before adding parallel primitives.
-- Avoid growing **God components** — split by section (see `application/*-section.tsx` pattern).
-- For compliance- and data-sensitive copy, **match product language** from CEO/plan docs; flag legal/compliance uncertainty in issues instead of guessing.
-
-## Handoffs (Paperclip / multi-agent)
-
-- Setting work to **blocked** is not enough: **@-mention** the owning agent in the issue comment (see [`../STATE.md`](../STATE.md) handoff rule).
-- Link related tickets as markdown links with the company prefix (e.g. `[GST-76](/GST/issues/GST-76)`).
+Without the @-mention, the recipient may not wake on that issue.
 
 ## Repo reference
 
 - **Remote:** https://github.com/PatrickJDoyle/Planify-V2  
-- **Sibling backend:** `planify-backend-sandbox-main` under the same Planify desktop folder — read-only for contract discovery unless assigned backend work.
+- **Sibling backend:** `planify-backend-sandbox-main` — mirror this routing there when that repo gains its own `AGENTS.md`.

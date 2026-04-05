@@ -1,11 +1,16 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ThemeProvider } from './theme-provider';
+import { initDemoAnalytics } from '@/lib/analytics/demo-analytics';
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    initDemoAnalytics();
+  }, []);
+
   const [queryClient] = useState(
     () =>
       new QueryClient({

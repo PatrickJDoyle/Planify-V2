@@ -14,6 +14,7 @@ import { EmptyState } from '@/components/shared/empty-state';
 import { PrePlanningReportWizard } from '@/components/reports/pre-planning-wizard';
 import { PaywallModal } from '@/components/billing/paywall-modal';
 import { useUserProfile } from '@/lib/queries/user';
+import { DEMO_LEGAL_DISCLAIMER } from '@/lib/demo-trust-copy';
 
 const FEATURE_CARDS = [
   {
@@ -90,6 +91,10 @@ export default function PrePlanningReportPage() {
             Generate first report
           </Button>
         </EmptyState>
+
+        <p className="mt-10 border-t border-border pt-6 text-center text-[11px] leading-relaxed text-foreground-muted">
+          {DEMO_LEGAL_DISCLAIMER}
+        </p>
       </div>
 
       <PrePlanningReportWizard open={wizardOpen} onOpenChange={setWizardOpen} />

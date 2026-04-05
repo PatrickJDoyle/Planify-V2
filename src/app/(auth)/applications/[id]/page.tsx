@@ -23,6 +23,7 @@ import { BcmsSection } from '@/components/application/bcms-section';
 import { NearbySalesSection } from '@/components/application/nearby-sales-section';
 import { RelatedSection } from '@/components/application/related-section';
 import { ResearchAssistant } from '@/components/ai/research-assistant';
+import { captureDemoEvent, DEMO_EVENT } from '@/lib/analytics/demo-analytics';
 
 export default function ApplicationDetailPage() {
   const params = useParams<{ id: string }>();
@@ -88,7 +89,14 @@ export default function ApplicationDetailPage() {
 
       <div className="flex-1 px-6 py-4">
         <div className="mx-auto max-w-6xl">
-          <Tabs defaultValue="overview">
+          <Tabs
+            defaultValue="overview"
+            onValueChange={(value) =>
+              captureDemoEvent(DEMO_EVENT.REPORT_METRIC_INTERACTION, {
+                section_key: `application_tab:${value}`,
+              })
+            }
+          >
             <TabsList>
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="documents">Documents</TabsTrigger>

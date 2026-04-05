@@ -25,6 +25,12 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useCreateAlert } from '@/lib/queries/alerts';
+import {
+  captureDemoEvent,
+  consumePostReportSessionForAlert,
+  DEMO_EVENT,
+  hasPostReportSession,
+} from '@/lib/analytics/demo-analytics';
 import { useUserProfile } from '@/lib/queries/user';
 import { PLANNING_AUTHORITIES } from '@/lib/utils/constants';
 import type { AlertScope, AlertType } from '@/lib/types/alerts';
@@ -314,6 +320,12 @@ export function AlertWizard({ open, onOpenChange, initialState }: AlertWizardPro
       },
       {
         onSuccess: () => {
+          if (hasPostReportSession()) {
+            captureDemoEvent(DEMO_EVENT.ALERT_CREATED_POST_REPORT, {
+              alert_scope: state.scope,
+            });
+            consumePostReportSessionForAlert();
+          }
           handleClose();
         },
       },

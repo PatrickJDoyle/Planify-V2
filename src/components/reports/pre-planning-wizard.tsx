@@ -25,6 +25,16 @@ import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { useOptimalRadius, useGeneratePrePlanningReport } from '@/lib/queries/reports';
+import {
+  applicationCountBand,
+  captureDemoEvent,
+  DEMO_EVENT,
+  markPostReportSession,
+} from '@/lib/analytics/demo-analytics';
+import {
+  DEMO_LEGAL_DISCLAIMER,
+  DEMO_LOW_APPLICATION_SAMPLE,
+} from '@/lib/demo-trust-copy';
 
 interface ReportWizardProps {
   open: boolean;
@@ -163,6 +173,15 @@ export function PrePlanningReportWizard({ open, onOpenChange }: ReportWizardProp
         intentionSubCategory: state.intentionSubCategory,
       });
       setReportContent(result.content);
+      markPostReportSession();
+      const initialCount = optimalRadius?.initialCount ?? 0;
+      captureDemoEvent(DEMO_EVENT.DEMO_REPORT_GENERATED, {
+        intention_category: state.intentionCategory,
+        intention_subcategory: state.intentionSubCategory,
+        unique_application_count_band: applicationCountBand(initialCount),
+        has_zoning_context: false,
+        initial_vs_adjusted_radius: `${state.radius}:${optimalRadius?.adjustedRadius ?? state.radius}`,
+      });
     } catch {
       setStep('intention');
     }
@@ -261,6 +280,11 @@ export function PrePlanningReportWizard({ open, onOpenChange }: ReportWizardProp
                     <p className="mt-0.5 text-xs text-foreground-muted">
                       {optimalRadius.initialCount} applications found in this area
                     </p>
+                    {optimalRadius.initialCount < 15 && (
+                      <p className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-[11px] leading-snug text-amber-950 dark:text-amber-100">
+                        {DEMO_LOW_APPLICATION_SAMPLE}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -371,13 +395,34 @@ export function PrePlanningReportWizard({ open, onOpenChange }: ReportWizardProp
                     Your pre-planning intelligence report has been generated.
                   </p>
                 </div>
-                <Button
-                  className="gap-2 bg-brand-500 hover:bg-brand-600"
-                  onClick={handleClose}
-                >
-                  <FileText className="h-4 w-4" />
-                  View Report
-                </Button>
+                <p className="max-w-sm text-center text-[11px] leading-snug text-foreground-muted">
+                  {DEMO_LEGAL_DISCLAIMER}
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(reportContent);
+                        captureDemoEvent(DEMO_EVENT.REPORT_EXPORTED, { format: 'clipboard_markdown' });
+                      } catch {
+                        /* ignore */
+                      }
+                    }}
+                  >
+                    <FileText className="h-4 w-4" />
+                    Copy report
+                  </Button>
+                  <Button
+                    className="gap-2 bg-brand-500 hover:bg-brand-600"
+                    onClick={handleClose}
+                  >
+                    <FileText className="h-4 w-4" />
+                    View Report
+                  </Button>
+                </div>
               </>
             ) : null}
           </div>

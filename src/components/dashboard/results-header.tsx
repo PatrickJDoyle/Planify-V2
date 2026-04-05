@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { useDashboardStore } from '@/lib/stores/dashboard-store';
 import { SORT_OPTIONS } from '@/lib/utils/constants';
 import type { ViewMode, SortOption } from '@/lib/types/filters';
+import { captureDemoEvent, DEMO_EVENT } from '@/lib/analytics/demo-analytics';
 
 interface ResultsHeaderProps {
   totalResults: number;
@@ -62,7 +63,12 @@ export function ResultsHeader({ totalResults, isLoading }: ResultsHeaderProps) {
             {SORT_OPTIONS.map((option) => (
               <DropdownMenuItem
                 key={option.id}
-                onClick={() => setSortBy(option.id as SortOption)}
+                onClick={() => {
+                  setSortBy(option.id as SortOption);
+                  captureDemoEvent(DEMO_EVENT.REPORT_METRIC_INTERACTION, {
+                    section_key: `sort:${option.id}`,
+                  });
+                }}
                 className={sortBy === option.id ? 'bg-brand-50 text-brand-700 dark:bg-brand-900 dark:text-brand-200' : ''}
               >
                 {option.name}
@@ -79,7 +85,12 @@ export function ResultsHeader({ totalResults, isLoading }: ResultsHeaderProps) {
             <Tooltip key={mode}>
               <TooltipTrigger asChild>
                 <button
-                  onClick={() => setViewMode(mode)}
+                  onClick={() => {
+                    setViewMode(mode);
+                    captureDemoEvent(DEMO_EVENT.REPORT_METRIC_INTERACTION, {
+                      section_key: `view:${mode}`,
+                    });
+                  }}
                   className={cn(
                     'flex h-7 w-7 items-center justify-center rounded transition-colors',
                     viewMode === mode

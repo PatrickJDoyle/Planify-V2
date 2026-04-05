@@ -10,6 +10,11 @@ import { formatDate, calculateSubmissionDeadline } from '@/lib/utils/dates';
 import { formatAddress, formatDescription, formatDistance } from '@/lib/utils/formatting';
 import { useDashboardStore } from '@/lib/stores/dashboard-store';
 import type { Application } from '@/lib/types/application';
+import {
+  captureDemoEvent,
+  consumePendingAppNavigationFromReport,
+  DEMO_EVENT,
+} from '@/lib/analytics/demo-analytics';
 
 interface ApplicationCardProps {
   application: Application;
@@ -20,6 +25,11 @@ export function ApplicationCard({ application: app }: ApplicationCardProps) {
   const { setScrollPosition, setSelectedApplicationId } = useDashboardStore();
 
   const handleClick = () => {
+    if (consumePendingAppNavigationFromReport()) {
+      captureDemoEvent(DEMO_EVENT.APPLICATION_OPENED_FROM_REPORT, {
+        reference_present: (app.matchedKeywords?.length ?? 0) > 0,
+      });
+    }
     setScrollPosition(window.scrollY);
     setSelectedApplicationId(app.applicationId);
     router.push(`/applications/${app.applicationId}`);
