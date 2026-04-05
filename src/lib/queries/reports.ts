@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { reportsApi } from '@/lib/api/reports';
+import { reportJobsApi, waitForPrePlanningJob } from '@/lib/api/report-jobs';
 import type { PrePlanningGeneratePayload } from '@/lib/types/phase5';
 import { queryKeys } from './keys';
 
@@ -42,8 +43,24 @@ export function useComputePrePlanningStats() {
   });
 }
 
-export function useGeneratePrePlanningReport() {
+export type RunPrePlanningReportJobVariables = PrePlanningGeneratePayload & {
+  pollSignal?: AbortSignal;
+};
+
+/** Creates a persistent report job and polls until HTML is available (same rows as Report History). */
+export function useRunPrePlanningReportJob() {
   return useMutation({
-    mutationFn: (payload: PrePlanningGeneratePayload) => reportsApi.generate(payload),
+    mutationFn: async (variables: RunPrePlanningReportJobVariables) => {
+      const { pollSignal, ...payload } = variables;
+      const { jobId } = await reportJobsApi.createPrePlanningJob(payload);
+      const job = await waitForPrePlanningJob(jobId, { signal: pollSignal });
+      const content = job.combinedHtml ?? job.narrativeHtml ?? '';
+      if (!content.trim()) {
+        throw new Error(
+          'Report completed but no content was saved. Try Report History or generate again.',
+        );
+      }
+      return { content, jobId };
+    },
   });
 }

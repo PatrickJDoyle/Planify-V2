@@ -202,6 +202,7 @@ export function ApplicationPackage({
                                 window.URL.revokeObjectURL(url);
                                 a.remove();
                               } catch (err) {
+                                // eslint-disable-next-line no-console -- surface download failures during dev/debug
                                 console.error('Download failed:', err);
                                 alert('Download failed. The document may need to be regenerated.');
                               }
