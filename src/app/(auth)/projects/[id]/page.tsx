@@ -23,6 +23,7 @@ import {
   useRetryResearch,
   useGenerateDocuments,
   type ProjectStatus,
+  type IrishPlanningFlags,
 } from '@/lib/queries/planify';
 
 // ─── Status Badge (same as projects list) ────────────────────────────────────
@@ -43,6 +44,63 @@ const statusConfig: Record<
 function ProjectStatusBadge({ status }: { status: ProjectStatus }) {
   const config = statusConfig[status] ?? statusConfig.draft;
   return <Badge className={config.className}>{config.label}</Badge>;
+}
+
+// ─── Irish Planning Banners ──────────────────────────────────────────────────
+
+function IrishPlanningBanners({ flags }: { flags: IrishPlanningFlags }) {
+  const banners: { key: string; variant: 'info' | 'warning'; message: string }[] = [];
+
+  if (flags.exemptionCheck.likelyExempt && flags.exemptionCheck.exemptionClass) {
+    banners.push({
+      key: 'exemption',
+      variant: 'info',
+      message: `This development may be exempt under Class ${flags.exemptionCheck.exemptionClass} — verify with your council before submitting a full planning application.`,
+    });
+  }
+
+  if (flags.abpFlags.isStrategicHousingDevelopment) {
+    banners.push({
+      key: 'shd',
+      variant: 'warning',
+      message: 'This development exceeds the Strategic Housing Development threshold — An Bord Pleanála is the deciding authority, not the local council.',
+    });
+  }
+
+  if (flags.abpFlags.requiresAaScreening) {
+    banners.push({
+      key: 'aa',
+      variant: 'warning',
+      message: 'This council area contains or is adjacent to a Natura 2000 site — an Appropriate Assessment Screening may be required.',
+    });
+  }
+
+  if (flags.abpFlags.isMaterialContravention) {
+    banners.push({
+      key: 'contravention',
+      variant: 'warning',
+      message: 'Zoning data suggests this development may materially contravene the local development plan — specialist planning advice is recommended.',
+    });
+  }
+
+  if (banners.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      {banners.map((banner) => (
+        <div
+          key={banner.key}
+          className={`rounded-lg border px-4 py-3 text-sm ${
+            banner.variant === 'warning'
+              ? 'border-amber-200 bg-amber-50 text-amber-800'
+              : 'border-brand-200 bg-brand-50 text-brand-800'
+          }`}
+        >
+          {banner.message}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
@@ -166,6 +224,11 @@ export default function ProjectDetailPage() {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Irish Planning Banners */}
+      {project.irishFlags && (
+        <IrishPlanningBanners flags={project.irishFlags} />
+      )}
 
       {/* Agent Status Cards — Sequential, full-width */}
       <div className="space-y-4">

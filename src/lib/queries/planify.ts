@@ -16,6 +16,21 @@ export type ProjectStatus =
 
 export type AgentStatus = 'idle' | 'queued' | 'running' | 'complete' | 'failed';
 
+export interface IrishPlanningFlags {
+  exemptionCheck: {
+    likelyExempt: boolean;
+    exemptionClass?: string;
+    conditions: string[];
+    caveats: string[];
+  };
+  abpFlags: {
+    isStrategicHousingDevelopment: boolean;
+    requiresAaScreening: boolean;
+    isMaterialContravention: boolean;
+  };
+  warnings: string[];
+}
+
 export interface PlanifyProject {
   id: string;
   name: string;
@@ -28,6 +43,7 @@ export interface PlanifyProject {
   numberOfUnits?: number;
   status: ProjectStatus;
   statusSummary?: string;
+  irishFlags?: IrishPlanningFlags;
   createdAt: string;
   updatedAt: string;
 }
