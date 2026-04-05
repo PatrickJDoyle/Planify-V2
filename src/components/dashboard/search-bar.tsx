@@ -14,6 +14,8 @@ import {
 import { cn } from '@/lib/utils';
 import { useDashboardStore } from '@/lib/stores/dashboard-store';
 import { GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_LOADER_ID } from '@/lib/maps/google-loader';
+import { ENTERPRISE_MAP_STYLES } from '@/lib/maps/map-styles';
+import { formatRadiusMeters, getZoomForRadius } from '@/lib/maps/map-zoom';
 
 type SearchMode = 'address' | 'reference';
 
@@ -21,16 +23,6 @@ const RADIUS_MIN = 100;
 const RADIUS_MAX = 5000;
 const RADIUS_STEP = 100;
 const DEFAULT_RADIUS = 1000;
-
-// Ireland center for initial map
-const IRELAND_CENTER = { lat: 53.4, lng: -7.9 };
-
-function formatRadius(meters: number): string {
-  if (meters >= 1000) {
-    return `${(meters / 1000).toFixed(meters % 1000 === 0 ? 0 : 1)}km`;
-  }
-  return `${meters}m`;
-}
 
 export function SearchBar() {
   const { setFilters, resetFilters, setSearchMode: setStoreSearchMode, filters } = useDashboardStore();
@@ -265,7 +257,7 @@ export function SearchBar() {
             className="flex-1"
           />
           <span className="min-w-[48px] text-right text-sm font-semibold text-foreground">
-            {formatRadius(radius)}
+            {formatRadiusMeters(radius)}
           </span>
           <Button
             variant="outline"
@@ -292,7 +284,7 @@ export function SearchBar() {
               mapTypeControl: false,
               streetViewControl: false,
               fullscreenControl: false,
-              styles: mapStyles,
+              styles: ENTERPRISE_MAP_STYLES,
             }}
           >
             <Marker
@@ -314,7 +306,7 @@ export function SearchBar() {
           </GoogleMap>
           <div className="border-t border-border bg-background-subtle px-3 py-2">
             <p className="text-xs text-foreground-muted">
-              Drag the marker to adjust location. Showing results within {formatRadius(radius)} of{' '}
+              Drag the marker to adjust location. Showing results within {formatRadiusMeters(radius)} of{' '}
               <span className="font-medium text-foreground">{selectedPlace.address}</span>
             </p>
           </div>
@@ -323,18 +315,3 @@ export function SearchBar() {
     </div>
   );
 }
-
-function getZoomForRadius(radius: number): number {
-  if (radius <= 200) return 16;
-  if (radius <= 500) return 15;
-  if (radius <= 1000) return 14;
-  if (radius <= 2000) return 13;
-  if (radius <= 3000) return 12;
-  return 11;
-}
-
-// Subtle enterprise map style
-const mapStyles: google.maps.MapTypeStyle[] = [
-  { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-  { featureType: 'transit', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-];

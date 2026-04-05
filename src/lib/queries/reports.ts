@@ -43,12 +43,6 @@ export function useComputePrePlanningStats() {
   });
 }
 
-export function useGeneratePrePlanningReport() {
-  return useMutation({
-    mutationFn: (payload: PrePlanningGeneratePayload) => reportsApi.generate(payload),
-  });
-}
-
 export type RunPrePlanningReportJobVariables = PrePlanningGeneratePayload & {
   pollSignal?: AbortSignal;
 };
